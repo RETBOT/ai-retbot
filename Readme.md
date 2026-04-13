@@ -365,6 +365,60 @@ ports:
 
 ---
 
+## 🤖 OpenCode Desktop - Configuración
+
+### Configurar OpenCode para conectar a tu API
+
+Edita el archivo `~/.config/opencode/opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "disabled_providers": [
+    "ollama-local"
+  ],
+  "model": "mi-api/qwen:0.5b",
+  "provider": {
+    "mi-api": {
+      "name": "Mi API Local",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://localhost:8000"
+      },
+      "models": {
+        "qwen:0.5b": {
+          "name": "qwen:0.5b"
+        }
+      }
+    }
+  }
+}
+```
+
+### Para conectar desde otra PC (servidor)
+
+Cambia `localhost` por la IP del servidor:
+
+```json
+"baseURL": "http://192.168.1.100:8000"
+```
+
+### Endpoints disponibles
+
+| Endpoint | Descripción |
+|----------|-------------|
+| `/v1/chat` | Chat compatible con OpenAI (sin auth requerida) |
+| `/v1/chat/completions` | Chat con autenticación JWT |
+
+### Probar OpenCode
+
+1. Iniciar el contenedor: `docker-compose up -d`
+2. Abrir OpenCode Desktop
+3. Seleccionar modelo `mi-api/qwen:0.5b`
+4. Enviar mensaje: "Hola"
+
+---
+
 ## 📄 Licencia
 
 MIT License

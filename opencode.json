@@ -1,21 +1,20 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "provider": {
-    "ollama": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Ollama Local",
+    "mi-api": {
+      "name": "Mi API Local",
       "options": {
-        "baseURL": "http://localhost:11435/v1"
+        "baseURL": "http://localhost:8000",
+        "headers": {
+          "Authorization": "Bearer TU_TOKEN_AQUI"
+        }
       },
       "models": {
         "qwen:0.5b": {
           "name": "qwen:0.5b"
-        },
-        "qwen:2.5-coder": {
-          "name": "qwen:2.5-coder"
         }
       }
     }
   },
-  "model": "ollama/qwen:0.5b"
+  "model": "mi-api/qwen:0.5b"
 }
