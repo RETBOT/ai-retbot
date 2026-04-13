@@ -1,328 +1,370 @@
-# 🤖 AI Coding Agent
+# 🤖 AI Coding Assistant API
 
-> Agente de IA local compatible con OpenCode usando Ollama
+> API multi-usuario con autenticación, gestión de usuarios y Ollama integrado en Docker
+> Para equipos de programación (25-30 desarrolladores)
 
 ---
 
-## 📁 Estructura del Proyecto
+## 📋 Estado del Proyecto
 
-```
-ai/
-├── server.py          # API FastAPI
-├── agent.py          # Lógica del agente
-├── tools.py          # Herramientas del agente
-├── ollama_init.py    # Auto-inicio de Ollama
-├── requirements.txt  # Dependencias Python
-├── opencode.json     # Config para OpenCode
-└── venv/             # Entorno virtual
-```
+✅ **Implementado:**
+- Autenticación JWT con passwords seguras
+- Gestión de usuarios (admin)
+- Rate limiting
+- Logs de auditoría
+- Password con expiración
+- Chat con Ollama (modelo qwen:0.5b)
+- Docker con todo incluido (Python API + Ollama)
 
 ---
 
 ## 🏗️ Arquitectura
 
 ```
-┌─────────────┐
-│  OpenCode   │ (u otro cliente OpenAI)
-└──────┬──────┘
-       │ HTTP
-       ▼
-┌─────────────┐
-│ FastAPI     │ server.py (puerto 8000)
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│   Agent    │ agent.py
-└──────┬──────┘
-       │ Tools
-       ▼
-┌─────────────┐
-│   Ollama   │ phi3:mini (puerto 11434)
-└─────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    Docker Container                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                          │
+│  ┌────────────────┐  ┌────────────────┐  ┌──────────┐│
+│  │ FastAPI API   │  │  opencode-   │  │  Ollama  ││
+│  │  :8000     │  │  llm-proxy │  │  :11434 ││
+│  │            │  │  :4010    │  │         ││
+│  └─────┬──────┘  └─────┬─────┘  └────┬───┘│
+│        │               │             │         │
+│        │        JWT Auth + Rate Limiting │         │
+│        │               │             │         │
+│        ▼               ▼             ▼         │
+│  ┌─────────────────────────────────────┐│
+│  │         SQLite Database             ││
+│  │    (users, jobs, audit_logs)       ││
+│  └─────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+                          │
+         ┌───────────────┴───────────────┐
+         ▼                           ▼
+┌──────────────────┐      ┌──────────────────┐
+│ OpenCode App     │      │ Programmers     │
+│ (Tu PC)       │      │ (25-30 users) │
+│               │      │              │
+│ → :8000/JWT  │      │ → :8000/JWT  │
+└──────────────────┘      └──────────────────┘
 ```
 
 ---
 
-## 📦 Requisitos
+## 📦 Requisitos Previos
 
-- Python 3.10+
-- Ollama instalado
-- Windows 10+ / Linux / macOS
+- Docker Desktop instalado
+- Git (para clonar)
+- 4GB RAM mínimo
+- 10GB espacio en disco
 
 ---
 
-## 🚀 Instalación
+## 🚀 Instalación Completa
 
-### 1. Clonar/Copiar el proyecto
+### 1. Clonar el proyecto
 
 ```bash
+git clone <URL_DEL_REPO>
 cd ai
 ```
 
-### 2. Crear entorno virtual
+### 2. Configurar variables de entorno
+
+Editar `.env`:
 
 ```bash
-python -m venv venv
+# Puerto del servidor
+PORT=8000
+
+# Modelo (Ollama local)
+MODEL_NAME=qwen:0.5b
+MODEL_TYPE=ollama
+OLLAMA_URL=http://localhost:11434
+OPENCODE_URL=http://localhost:4010
+
+# Seguridad - CAMBIA ESTO
+SECRET_KEY=4f8c9b2e7d1a6c3f5e0a9d4b8c2f7e1a9c6d3b5f0a8e2c1d7f4b9a6c3e1d8f2
+PASSWORD_EXPIRE_DAYS=30
+ADMIN_PASSWORD=TuPasswordAdminMuySeguro123!
+
+# Rate limiting
+RATE_LIMIT_PER_MINUTE=10
 ```
 
-### 3. Activar entorno
+### 3. Build de la imagen Docker
 
-**Windows:**
 ```bash
-venv\Scripts\activate
+docker-compose build
 ```
 
-**Linux/macOS:**
+### 4. Iniciar los servicios
+
 ```bash
-source venv/bin/activate
+docker-compose up -d
 ```
 
-### 4. Instalar dependencias
+### 5. Verificar que todo funcione
 
 ```bash
-pip install -r requirements.txt
-```
+# Ver estado de contenedores
+docker-compose ps
 
-### 5. Instalar Ollama
-
-Descarga desde: https://ollama.com/download
-
-### 6. Descargar modelo
-
-```bash
-ollama pull phi3:mini
+# Ver logs
+docker-compose logs -f
 ```
 
 ---
 
-## 🚀 Inicio Rápido
+## ▶️ Verificación
 
-### Opción 1: Manual
-
-```bash
-# Terminal 1: Activar entorno y ejecutar
-venv\Scripts\activate
-uvicorn server:app --reload
-```
-
-Ollama se inicia automáticamente.
-
-### Opción 2: Script automático
+### Health check
 
 ```bash
-start.bat
+curl http://localhost:8000/health
 ```
 
----
+**Respuesta esperada:**
+```json
+{
+  "status": "ok",
+  "model_type": "ollama",
+  "model": "qwen:0.5b",
+  "ollama": "connected",
+  "opencode": "not_available",
+  "models_found": [{"name": "qwen:0.5b", ...}]
+}
+```
 
-## 🔧 Configuración
-
-### Variables de Entorno
-
-| Variable | Default | Descripción |
-|----------|---------|-------------|
-| `OLLAMA_URL` | `http://localhost:11434` | URL de Ollama |
-| `MODEL_NAME` | `phi3:mini` | Modelo a usar |
-| `PORT` | `8000` | Puerto del servidor |
-| `API_KEY` | `None` | API key opcional |
-
-### Ejemplo
+### Login con admin
 
 ```bash
-export OLLAMA_URL=http://192.168.1.100:11434
-export MODEL_NAME=qwen2.5:3b
-export PORT=8000
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"TuPasswordAdminMuySeguro123!"}'
 ```
 
----
-
-## 🧰 Herramientas del Agente
-
-El agente puede usar las siguientes herramientas automáticamente:
-
-### read_file
-Lee contenido de archivos.
+**Retorna:**
 ```json
-{"tool": "read_file", "path": "server.py", "offset": 0, "limit": 200}
-```
-
-### write_file
-Crea o sobrescribe archivos.
-```json
-{"tool": "write_file", "path": "test.py", "content": "print('hello')"}
-```
-
-### glob
-Busca archivos por patrón.
-```json
-{"tool": "glob", "pattern": "**/*.py"}
-```
-
-### grep
-Busca texto en archivos.
-```json
-{"tool": "grep", "pattern": "FastAPI", "include": "*.py"}
-```
-
-### bash
-Ejecuta comandos de terminal.
-```json
-{"tool": "bash", "command": "python test.py"}
-```
-
-### list_files
-Lista contenido de directorio.
-```json
-{"tool": "list_files"}
+{
+  "access_token": "eyJhbGc...",
+  "token_type": "bearer",
+  "expires_at": "2026-04-20T..."
+}
 ```
 
 ---
 
 ## 📡 Endpoints
 
-### GET /
-Estado del servidor.
+### Auth (Público)
 
-```bash
-curl http://localhost:8000/
-```
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/auth/login` | POST | Login → JWT token |
+| `/auth/me` | GET | Info del usuario actual |
+| `/auth/password` | PUT | Cambiar mi password |
 
-### GET /health
-Verifica conexión con Ollama.
+### Admin (Solo admin)
 
-```bash
-curl http://localhost:8000/health
-```
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/admin/users` | POST | Crear usuario |
+| `/admin/users` | GET | Listar usuarios |
+| `/admin/users/{id}` | PUT | Editar usuario |
+| `/admin/users/{id}` | DELETE | Desactivar usuario |
+| `/admin/jobs` | GET | Todos los jobs |
+| `/admin/audit-logs` | GET | Logs de auditoría |
 
-### GET /v1/models
-Lista modelos disponibles.
+### Jobs (Usuario)
 
-```bash
-curl http://localhost:8000/v1/models
-```
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/v1/chat/completions` | POST | Crear job de chat |
+| `/v1/jobs/{job_id}` | GET | Estado del job |
+| `/v1/jobs` | GET | Mis jobs |
 
-### POST /v1/chat/completions
-Chat con streaming.
+### Sistema
 
-```bash
-curl -X POST http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "phi3:mini",
-    "messages": [{"role": "user", "content": "Hola"}],
-    "stream": false
-  }'
-```
-
----
-
-## 🔌 Uso con OpenCode
-
-### 1. Copiar configuración
-
-**Windows:**
-```powershell
-copy opencode.json "$env:USERPROFILE\.config\opencode\opencode.json"
-```
-
-**Linux/macOS:**
-```bash
-cp opencode.json ~/.config/opencode/opencode.json
-```
-
-### 2. Iniciar OpenCode
-
-```bash
-opencode
-```
-
-### 3. Seleccionar modelo
-
-```
-/models
-```
-
-Selecciona: `phi3:mini`
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/` | GET | Info del servidor |
+| `/health` | GET | Health check |
 
 ---
 
 ## 🧪 Ejemplos de Uso
 
-### Ejemplo 1: Chat básico
+### 1. Login
 
 ```bash
-curl -X POST http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model": "phi3:mini", "messages": [{"role": "user", "content": "Explica qué hace FastAPI"}]}'
+curl -X POST http://localhost:8000/auth/login ^
+  -H "Content-Type: application/json" ^
+  -d "{\"username\":\"admin\",\"password\":\"TuPasswordAdminMuySecure123!\"}"
 ```
 
-### Ejemplo 2: Streaming
+Guardar el `access_token` returned.
+
+### 2. Crear usuario programador (solo admin)
 
 ```bash
-curl -X POST http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model": "phi3:mini", "messages": [{"role": "user", "content": "Cuenta hasta 10"}], "stream": true}'
+curl -X POST http://localhost:8000/admin/users ^
+  -H "Authorization: Bearer TU_TOKEN" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"username\":\"programador1\",\"password\":\"password123\"}"
 ```
+
+### 3. Enviar mensaje al chat
+
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions ^
+  -H "Authorization: Bearer TU_TOKEN" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"message\":\"Crea un hola mundo en Python\",\"model\":\"qwen:0.5b\"}"
+```
+
+**Respuesta:**
+```json
+{
+  "job_id": "...",
+  "status": "completed",
+  "result": "Aquí viene la respuesta del modelo..."
+}
+```
+
+---
+
+## 🔧 Comandos Útiles
+
+### Ver contenedores
+
+```bash
+docker-compose ps
+```
+
+### Ver logs en tiempo real
+
+```bash
+docker-compose logs -f
+```
+
+### Ver logs de un servicio específico
+
+```bash
+docker-compose logs -f api
+```
+
+### Reiniciar servicios
+
+```bash
+docker-compose restart
+```
+
+### Detener servicios
+
+```bash
+docker-compose down
+```
+
+### Eliminar todo (incluyendo volúmenes)
+
+```bash
+docker-compose down -v
+```
+
+### Rebuild y reiniciar
+
+```bash
+docker-compose down
+docker-compose build
+docker-compose up -d
+```
+
+---
+
+## ⚙�� Configuración
+
+### Variables de entorno (.env)
+
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `PORT` | 8000 | Puerto del servidor |
+| `MODEL_TYPE` | ollama | Tipo: "ollama" o "opencode" |
+| `MODEL_NAME` | qwen:0.5b | Modelo a usar |
+| `OLLAMA_URL` | http://localhost:11434 | URL de Ollama |
+| `OPENCODE_URL` | http://localhost:4010 | URL de OpenCode proxy |
+| `SECRET_KEY` | (requerido) | Clave para JWT |
+| `PASSWORD_EXPIRE_DAYS` | 30 | Días hasta expirar password |
+| `ADMIN_PASSWORD` | (requerido) | Password inicial del admin |
+| `RATE_LIMIT_PER_MINUTE` | 10 | Límite de requests |
+
+---
+
+## 🔒 Seguridad
+
+### Características implementadas
+
+1. **JWT Tokens**: Expiran en 7 días
+2. **Password hashing**: bcrypt
+3. **Password expiración**: 30 días (configurable)
+4. **Rate limiting**: 10 req/min por IP
+5. **Logs de auditoría**: Todas las acciones de admin
+6. **Solo admin puede**: Crear usuarios, cambiar passwords, ver auditoría
 
 ---
 
 ## ⚠️ Troubleshooting
 
-### ❌ "Ollama not available"
+### Error: "ollama": "no_models"
 
-**Solución:**
+El modelo no está descargado. Descargarlo:
+
 ```bash
-ollama serve
+docker exec ai-api-1 ollama pull qwen:0.5b
 ```
 
-### ❌ "Module not found"
+### Error: "Password expirada"
 
-**Solución:**
 ```bash
-pip install -r requirements.txt
+curl -X PUT http://localhost:8000/auth/password ^
+  -H "Authorization: Bearer TOKEN" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"new_password\":\"nueva_password\"}"
 ```
 
-### ❌ OpenCode no responde
+### Error: "Rate limit exceeded"
 
-1. Verifica que el servidor esté corriendo
-2. Prueba `/health`
-3. Revisa que el modelo esté en `opencode.json`
+Esperar 1 minuto o aumentar `RATE_LIMIT_PER_MINUTE` en `.env`
 
-### ❌ Modelo muy lento
+### Ver logs para debug
 
-- Usa un modelo más pequeño
-- Cierra otras aplicaciones
-
-### ❌ Error 401 (API Key)
-
-Si configuraste `API_KEY`:
 ```bash
-curl -X POST http://localhost:8000/v1/chat/completions \
-  -H "Authorization: Bearer tu-api-key" \
-  -d '...'
+docker-compose logs -f api
 ```
 
 ---
 
-## 🤝 Contribuir
+## 🚢 Producción
 
-1. Fork el proyecto
-2. Crea una rama (`git checkout -b feature/nueva`)
-3. Commit (`git commit -am 'Agrega feature'`)
-4. Push (`git push origin feature/nueva`)
-5. Abre un Pull Request
+### Recomendaciones
+
+1. **Cambiar SECRET_KEY**: Clave larga y aleatoria
+2. **Cambiar ADMIN_PASSWORD**: Inmediatamente después del primer login
+3. **Configurar.redes**: Exponer puerto 8000
+4. **Backup de data.db**: Hacer backup regularmente
+
+### Puertos expuesta.
+
+Editar `docker-compose.yml`:
+
+```yaml
+ports:
+  - "8000:8000"  # Cambiar a "0.0.0.0:8000:8000" para exponer
+```
 
 ---
 
 ## 📄 Licencia
 
 MIT License
-
----
-
-## 🙏 Créditos
-
-- [Ollama](https://ollama.com) - Motor de IA local
-- [OpenCode](https://opencode.ai) - Coding agent
-- [FastAPI](https://fastapi.tiangolo.com) - Framework web

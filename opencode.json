@@ -1,18 +1,21 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "provider": {
-    "ollama-local": {
+    "ollama": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Ollama (Local)",
+      "name": "Ollama Local",
       "options": {
-        "baseURL": "http://localhost:8000/v1"
+        "baseURL": "http://localhost:11435/v1"
       },
       "models": {
-        "phi3:mini": {
-          "name": "Phi-3 Mini"
+        "qwen:0.5b": {
+          "name": "qwen:0.5b"
+        },
+        "qwen:2.5-coder": {
+          "name": "qwen:2.5-coder"
         }
       }
     }
   },
-  "model": "ollama-local/phi3:mini"
+  "model": "ollama/qwen:0.5b"
 }

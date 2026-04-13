@@ -1,4 +1,26 @@
+# API
 fastapi
 uvicorn
+python-multipart
+
+# Seguridad
+python-jose[cryptography]
+passlib[bcrypt]
+slowapi
+
+# Base de datos
+sqlalchemy
+aiosqlite
+
+# Cola de jobs
+redis
+arq
+
+# OpenCode SDK
+opencode-agent-sdk
+httpx
+
+# Utilidades
+pydantic-settings
+python-dateutil
 requests
-python-dotenv

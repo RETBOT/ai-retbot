@@ -1,29 +1,65 @@
+import logging
 import os
-import json
-import time
-import asyncio
-import requests
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
-from typing import AsyncIterator
-from ollama_init import init_ollama
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-MODEL_NAME = os.getenv("MODEL_NAME", "phi3:mini")
-API_KEY = os.getenv("API_KEY", None)
-PORT = int(os.getenv("PORT", "8000"))
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-app = FastAPI()
+limiter = Limiter(key_func=get_remote_address)
+
+from core.config import settings
+from core.database import init_db, User
+from core.auth import hash_password
 
 
-@app.on_event("startup")
-async def startup():
-    print("🚀 Iniciando servidor...")
-    try:
-        init_ollama()
-    except Exception as e:
-        print(f"⚠️ Advertencia: No se pudo iniciar Ollama: {e}")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    logger.info("Base de datos inicializada")
+    
+    from core.database import async_session
+    from sqlalchemy import select
+    
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.username == "admin"))
+        admin = result.scalar_one_or_none()
+        
+        if not admin and settings.ADMIN_PASSWORD:
+            from datetime import datetime, timedelta
+            admin = User(
+                username="admin",
+                password_hash=hash_password(settings.ADMIN_PASSWORD),
+                is_admin=True,
+                is_active=True,
+                password_changed_at=datetime.utcnow(),
+                password_expires_at=datetime.utcnow() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
+            )
+            session.add(admin)
+            await session.commit()
+            logger.info("Usuario admin creado desde .env")
+        elif not admin:
+            logger.warning("⚠️ No hay admin. Configura ADMIN_PASSWORD en .env")
+    
+    logger.info("Aplicación iniciada")
+    yield
+    logger.info("Aplicación cerrada")
+
+
+app = FastAPI(
+    title="AI Coding Assistant API",
+    description="API multi-usuario con Ollama",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,211 +69,70 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from api.auth import router as auth_router
+from api.admin import router as admin_router
+from api.jobs import router as jobs_router
 
-def check_api_key(request: Request) -> bool:
-    if API_KEY is None:
-        return True
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Bearer "):
-        token = auth[7:]
-        return token == API_KEY
-    return False
-
-
-def extract_json(text: str):
-    import re
-    try:
-        match = re.search(r"\{[\s\S]*?\}", text)
-        if match:
-            return json.loads(match.group(0))
-    except:
-        pass
-    return None
-
-
-def ollama_chat(messages: list, stream: bool = False, model: str = None):
-    url = f"{OLLAMA_URL}/api/chat"
-    payload = {
-        "model": model or MODEL_NAME,
-        "messages": messages,
-        "stream": stream
-    }
-    response = requests.post(url, json=payload, stream=stream, timeout=120)
-    response.raise_for_status()
-    return response
-
-
-async def stream_ollama(response, model: str) -> AsyncIterator[str]:
-    chunk_id = 0
-    for line in response.iter_lines():
-        if line:
-            try:
-                data = json.loads(line)
-                content = data.get("message", {}).get("content", "")
-                if content:
-                    chunk = {
-                        "id": f"chatcmpl-{int(time.time())}-{chunk_id}",
-                        "object": "chat.completion.chunk",
-                        "created": int(time.time()),
-                        "model": model,
-                        "choices": [{
-                            "index": 0,
-                            "delta": {"content": content},
-                            "finish_reason": None
-                        }]
-                    }
-                    yield f"data: {json.dumps(chunk)}\n\n"
-                    chunk_id += 1
-            except json.JSONDecodeError:
-                pass
-    
-    yield "data: [DONE]\n\n"
+app.include_router(auth_router)
+app.include_router(admin_router)
+app.include_router(jobs_router)
 
 
 @app.get("/health")
 async def health():
+    from core.models import get_model_provider, OllamaProvider, OpenCodeProvider
+    
+    ollama_status = "disconnected"
+    opencode_status = "disconnected"
+    
+    ollama = OllamaProvider()
+    
+    # Verificar Ollama
     try:
-        res = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
-        return {"status": "ok", "ollama": "connected"}
-    except:
-        return {"status": "ok", "ollama": "disconnected"}
-
-
-@app.get("/v1/models")
-async def list_models():
+        models = ollama.list_models()
+        ollama_status = "connected" if models else "no_models"
+    except Exception as e:
+        ollama_status = f"error: {str(e)}"
+    
+    # Verificar OpenCode
     try:
-        res = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
-        data = res.json()
-        models = data.get("models", [])
-        return {
-            "object": "list",
-            "data": [
-                {
-                    "id": m["name"],
-                    "object": "model",
-                    "created": int(time.time()),
-                    "owned_by": "local"
-                }
-                for m in models
-            ]
+        opencode = OpenCodeProvider()
+        opencode_status = "available" if opencode.is_available() else "not_available"
+    except Exception as e:
+        opencode_status = f"error: {str(e)}"
+    
+    from core.config import settings
+    return {
+        "status": "ok",
+        "model_type": settings.MODEL_TYPE,
+        "model": settings.MODEL_NAME,
+        "ollama_url": settings.OLLAMA_URL,
+        "ollama": ollama_status,
+        "opencode": opencode_status,
+        "debug": {
+            "models_found": ollama.list_models() if ollama_status != "error" else []
         }
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": {"message": str(e), "type": "internal_error"}}
-        )
-
-
-@app.post("/v1/chat/completions")
-async def chat_completions(request: Request):
-    if not check_api_key(request):
-        return JSONResponse(
-            status_code=401,
-            content={"error": {"message": "Invalid API key", "type": "unauthorized"}}
-        )
-
-    try:
-        body = await request.json()
-    except:
-        body = {}
-
-    messages = body.get("messages", [])
-    if not messages:
-        return JSONResponse(
-            status_code=400,
-            content={"error": {"message": "No messages provided", "type": "invalid_request"}}
-        )
-
-    last_message = messages[-1].get("content", "")
-    if isinstance(last_message, list):
-        last_message = " ".join(
-            x.get("text", "") for x in last_message if isinstance(x, dict)
-        )
-
-    model = body.get("model", MODEL_NAME)
-    stream = body.get("stream", False)
-
-    system_prompt = {
-        "role": "system",
-        "content": """You are a coding assistant. Use tools when needed.
-
-AVAILABLE TOOLS (all return text):
-- read_file(path, offset=0, limit=200): Read file content
-- write_file(path, content): Write/create file  
-- glob(pattern, path=None): Find files by pattern
-- grep(pattern, path=None, include="*"): Search text in files
-- bash(command): Run shell command
-- list_files(path=None): List directory contents
-- question(questions): Ask user for choices
-
-When using tools, respond ONLY with valid JSON:
-{"tool": "tool_name", "param": "value"}
-
-Rules:
-1. Keep responses SHORT and direct
-2. Use code blocks for code examples
-3. When tool is needed, respond ONLY with JSON
-4. If tool fails, explain error and try different approach
-5. After tool result, analyze it and respond or call another tool"""
     }
-
-    ollama_messages = [system_prompt] + messages
-
-    try:
-        response = ollama_chat(ollama_messages, stream=True, model=model)
-
-        if stream:
-            return StreamingResponse(
-                stream_ollama(response, model),
-                media_type="text/event-stream",
-                headers={"Cache-Control": "no-cache"}
-            )
-        else:
-            data = response.json()
-            content = data.get("message", {}).get("content", "")
-            return {
-                "id": f"chatcmpl-{int(time.time())}",
-                "object": "chat.completion",
-                "created": int(time.time()),
-                "model": model,
-                "choices": [{
-                    "index": 0,
-                    "message": {"role": "assistant", "content": content},
-                    "finish_reason": "stop"
-                }],
-                "usage": {
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "total_tokens": 0
-                }
-            }
-
-    except requests.exceptions.Timeout:
-        return JSONResponse(
-            status_code=504,
-            content={"error": {"message": "Ollama request timeout", "type": "gateway_timeout"}}
-        )
-    except requests.exceptions.ConnectionError:
-        return JSONResponse(
-            status_code=503,
-            content={"error": {"message": "Ollama not available. Make sure it's running.", "type": "service_unavailable"}}
-        )
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": {"message": str(e), "type": "internal_error"}}
-        )
 
 
 @app.get("/")
 async def root():
     return {
-        "status": "ok",
-        "model": MODEL_NAME,
-        "ollama": OLLAMA_URL
+        "name": "AI Coding Assistant API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "admin": "/admin/users (solo admin)"
     }
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"error": {"message": "Rate limit exceeded", "type": "rate_limit_error", "code": "rate_limit_error"}}
+    )
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    uvicorn.run("server:app", host="0.0.0.0", port=settings.PORT, reload=True)
