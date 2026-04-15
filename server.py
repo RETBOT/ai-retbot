@@ -72,10 +72,12 @@ app.add_middleware(
 from api.auth import router as auth_router
 from api.admin import router as admin_router
 from api.jobs import router as jobs_router
+from api.streaming import router as streaming_router
 
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(jobs_router)
+app.include_router(streaming_router)
 
 
 @app.get("/health")

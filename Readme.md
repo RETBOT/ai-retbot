@@ -1,424 +1,362 @@
-# 🤖 AI Coding Assistant API
+# 🤖 AI Coding Assistant API - RETBOT
 
-> API multi-usuario con autenticación, gestión de usuarios y Ollama integrado en Docker
-> Para equipos de programación (25-30 desarrolladores)
+> API multi-usuario con autenticación JWT, Ollama para inferencia local y streaming SSE
+> Para equipos de programación que usan OpenCode o cualquier cliente compatible con OpenAI
 
 ---
 
-## 📋 Estado del Proyecto
+## 🎯 ¿Qué es RETBOT?
 
-✅ **Implementado:**
-- Autenticación JWT con passwords seguras
-- Gestión de usuarios (admin)
-- Rate limiting
-- Logs de auditoría
-- Password con expiración
-- Chat con Ollama (modelo qwen:0.5b)
-- Docker con todo incluido (Python API + Ollama)
+RETBot es tu asistente de programación local con:
+- **Autenticación JWT** - cada usuario tiene su propio token
+- **Streaming en tiempo real** - respuestas mientras se generan
+- **Multi-usuario** - cada quien tiene sus propios Jobs y auditoría
+- **Local y privado** - todo corre en tu PC/servidor
+- **Compatible OpenAI** - funciona con OpenCode, curl, Python, etc.
 
 ---
 
 ## 🏗️ Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Docker Container                  │
-├─────────────────────────────────────────────────────────────────┤
-│                                                          │
-│  ┌────────────────┐  ┌────────────────┐  ┌──────────┐│
-│  │ FastAPI API   │  │  opencode-   │  │  Ollama  ││
-│  │  :8000     │  │  llm-proxy │  │  :11434 ││
-│  │            │  │  :4010    │  │         ││
-│  └─────┬──────┘  └─────┬─────┘  └────┬───┘│
-│        │               │             │         │
-│        │        JWT Auth + Rate Limiting │         │
-│        │               │             │         │
-│        ▼               ▼             ▼         │
-│  ┌─────────────────────────────────────┐│
-│  │         SQLite Database             ││
-│  │    (users, jobs, audit_logs)       ││
-│  └─────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
-                          │
-         ┌───────────────┴───────────────┐
-         ▼                           ▼
-┌──────────────────┐      ┌──────────────────┐
-│ OpenCode App     │      │ Programmers     │
-│ (Tu PC)       │      │ (25-30 users) │
-│               │      │              │
-│ → :8000/JWT  │      │ → :8000/JWT  │
-└──────────────────┘      └──────────────────┘
+┌─────────────────────────────────────────────┐
+│              Tu Servidor / PC               │
+├─────────────────────────────────────────────┤
+│                                             │
+│  ┌──────────────┐       ┌──────────────┐    │
+│  │   FastAPI    │─────> │      Ollama  │    │
+│  │    :8000     │       │    :11434    │    │
+│  └──────┬───────┘       └──────────────┘    │
+│         │                                   │
+│   JWT Auth + Rate Limiting                  │
+│         │                                   │
+│         V                                   │
+│  ┌──────────────────────────────┐           │
+│  │       SQLite Database        │           │
+│  │ (users, jobs, audit_logs)    │           │
+│  └──────────────┬───────────────┘           │
+└─────────────────┼───────────────────────────┘
+                  │
+        ┌─────────┴─────────┐
+        V                   V
+┌──────────────────┐   ┌──────────────────┐
+│   OpenCode App   │   │   Programmers    │
+│     (Tu PC)      │   │   (tu equipo)    │
+│                  │   │                  │
+│   → :8000/JWT    │   │   → :8000/JWT    │
+└──────────────────┘   └──────────────────┘
 ```
 
+> **Nota:** También disponible en Docker (ver sección Docker)
+
 ---
 
-## 📦 Requisitos Previos
+## 💻 Requisitos
 
-- Docker Desktop instalado
+### Hardware mínimo
+
+| Componente | Mínimo | Recomendado |
+|-----------|-------|------------|
+| RAM | 4GB | 8GB+ |
+| VRAM (GPU) | - | 4GB+ para modelos grandes |
+| Disco | 10GB | 20GB+ |
+
+### Software
+
+- Python 3.10+
+- Ollama instalado (https://ollama.com)
 - Git (para clonar)
-- 4GB RAM mínimo
-- 10GB espacio en disco
+
+### 🎮 ¿Qué modelo me funciona?
+
+Consultá **[Can I Run It?](https://www.canirun.ai/)** para ver qué modelo se adapta a tu hardware.
+
+Modelos recomendados para inicio:
+- **tinyllama** (~1GB) -Para probar
+- **qwen2.5:0.5b** (~400MB) - Balanceado
+- **phi3:3.8b** (~2GB) - Mejor calidad
+- **qwen2.5:3b** (~2GB) -Muy buena calidad
 
 ---
 
-## 🚀 Instalación Completa
+## 🚀 Instalación Rápida (Sin Docker)
 
-### 1. Clonar el proyecto
+### 1. Clonar y entrar
 
 ```bash
 git clone <URL_DEL_REPO>
 cd ai
 ```
 
-### 2. Configurar variables de entorno
-
-Editar `.env`:
+### 2.Crear entorno virtual
 
 ```bash
-# Puerto del servidor
-PORT=8000
-
-# Modelo (Ollama local)
-MODEL_NAME=qwen:0.5b
-MODEL_TYPE=ollama
-OLLAMA_URL=http://localhost:11434
-OPENCODE_URL=http://localhost:4010
-
-# Seguridad - CAMBIA ESTO
-SECRET_KEY=4f8c9b2e7d1a6c3f5e0a9d4b8c2f7e1a9c6d3b5f0a8e2c1d7f4b9a6c3e1d8f2
-PASSWORD_EXPIRE_DAYS=30
-ADMIN_PASSWORD=TuPasswordAdminMuySeguro123!
-
-# Rate limiting
-RATE_LIMIT_PER_MINUTE=10
+python -m venv venv
+venv\Scripts\activate  # Windows
+# source venv/bin/activate  # Linux/Mac
 ```
 
-### 3. Build de la imagen Docker
+### 3. Instalar dependencias
 
 ```bash
-docker-compose build
+pip install -r requirements.txt
 ```
 
-### 4. Iniciar los servicios
+### 4. Configurar .env
 
 ```bash
-docker-compose up -d
+# .env
+ADMIN_PASSWORD=TuPasswordMuySegura123!
 ```
 
-### 5. Verificar que todo funcione
+### 5. Crear usuario admin
+
+El usuario **admin** se crea automáticamente la primera vez que iniciás la API usando el valor de `ADMIN_PASSWORD` en `.env`.
 
 ```bash
-# Ver estado de contenedores
-docker-compose ps
-
-# Ver logs
-docker-compose logs -f
+# username: admin
+# password: TuPasswordMuySegura123!
 ```
 
----
-
-## ▶️ Verificación
-
-### Health check
+### 6. Ver modelos disponibles
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8000/v1/models
 ```
 
-**Respuesta esperada:**
-```json
-{
-  "status": "ok",
-  "model_type": "ollama",
-  "model": "qwen:0.5b",
-  "ollama": "connected",
-  "opencode": "not_available",
-  "models_found": [{"name": "qwen:0.5b", ...}]
-}
-```
-
-### Login con admin
+### 7. Iniciar Ollama
 
 ```bash
-curl -X POST http://localhost:8000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"TuPasswordAdminMuySeguro123!"}'
+ollama serve
+ollama pull qwen2.5:0.5b
 ```
 
-**Retorna:**
-```json
-{
-  "access_token": "eyJhbGc...",
-  "token_type": "bearer",
-  "expires_at": "2026-04-20T..."
-}
+### 8. Iniciar la API
+
+```bash
+python server.py
 ```
 
 ---
 
 ## 📡 Endpoints
 
-### Auth (Público)
+### Auth
 
 | Endpoint | Método | Descripción |
 |----------|--------|-------------|
 | `/auth/login` | POST | Login → JWT token |
-| `/auth/me` | GET | Info del usuario actual |
+| `/auth/me` | GET | Info del usuario |
 | `/auth/password` | PUT | Cambiar mi password |
+
+### Chat (Protegido)
+
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/v1/chat/completions` | POST | Chat con streaming |
+| `/v1/models` | GET | Modelos disponibles |
 
 ### Admin (Solo admin)
 
 | Endpoint | Método | Descripción |
 |----------|--------|-------------|
-| `/admin/users` | POST | Crear usuario |
 | `/admin/users` | GET | Listar usuarios |
-| `/admin/users/{id}` | PUT | Editar usuario |
-| `/admin/users/{id}` | DELETE | Desactivar usuario |
+| `/admin/users` | POST | Crear usuario |
 | `/admin/jobs` | GET | Todos los jobs |
-| `/admin/audit-logs` | GET | Logs de auditoría |
-
-### Jobs (Usuario)
-
-| Endpoint | Método | Descripción |
-|----------|--------|-------------|
-| `/v1/chat/completions` | POST | Crear job de chat |
-| `/v1/jobs/{job_id}` | GET | Estado del job |
-| `/v1/jobs` | GET | Mis jobs |
 
 ### Sistema
 
 | Endpoint | Método | Descripción |
 |----------|--------|-------------|
-| `/` | GET | Info del servidor |
 | `/health` | GET | Health check |
+| `/` | GET | Info del servidor |
 
 ---
 
-## 🧪 Ejemplos de Uso
+## 🧪 Cómo Usar
 
-### 1. Login
+### 1. Login (obtener token)
 
 ```bash
 curl -X POST http://localhost:8000/auth/login ^
   -H "Content-Type: application/json" ^
-  -d "{\"username\":\"admin\",\"password\":\"TuPasswordAdminMuySecure123!\"}"
+  -d "{\"username\":\"admin\",\"password\":\"TuPasswordMuySegura123!\"}"
 ```
 
-Guardar el `access_token` returned.
-
-### 2. Crear usuario programador (solo admin)
-
-```bash
-curl -X POST http://localhost:8000/admin/users ^
-  -H "Authorization: Bearer TU_TOKEN" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"username\":\"programador1\",\"password\":\"password123\"}"
-```
-
-### 3. Enviar mensaje al chat
-
-```bash
-curl -X POST http://localhost:8000/v1/chat/completions ^
-  -H "Authorization: Bearer TU_TOKEN" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"message\":\"Crea un hola mundo en Python\",\"model\":\"qwen:0.5b\"}"
-```
-
-**Respuesta:**
+**Retorna:**
 ```json
 {
-  "job_id": "...",
-  "status": "completed",
-  "result": "Aquí viene la respuesta del modelo..."
+  "access_token": "eyJhbG...",
+  "token_type": "bearer",
+  "expires_at": "2026-04-21T..."
 }
 ```
 
----
-
-## 🔧 Comandos Útiles
-
-### Ver contenedores
+### 2. Usar el chat
 
 ```bash
-docker-compose ps
-```
-
-### Ver logs en tiempo real
-
-```bash
-docker-compose logs -f
-```
-
-### Ver logs de un servicio específico
-
-```bash
-docker-compose logs -f api
-```
-
-### Reiniciar servicios
-
-```bash
-docker-compose restart
-```
-
-### Detener servicios
-
-```bash
-docker-compose down
-```
-
-### Eliminar todo (incluyendo volúmenes)
-
-```bash
-docker-compose down -v
-```
-
-### Rebuild y reiniciar
-
-```bash
-docker-compose down
-docker-compose build
-docker-compose up -d
-```
-
----
-
-## ⚙�� Configuración
-
-### Variables de entorno (.env)
-
-| Variable | Default | Descripción |
-|----------|---------|-------------|
-| `PORT` | 8000 | Puerto del servidor |
-| `MODEL_TYPE` | ollama | Tipo: "ollama" o "opencode" |
-| `MODEL_NAME` | qwen:0.5b | Modelo a usar |
-| `OLLAMA_URL` | http://localhost:11434 | URL de Ollama |
-| `OPENCODE_URL` | http://localhost:4010 | URL de OpenCode proxy |
-| `SECRET_KEY` | (requerido) | Clave para JWT |
-| `PASSWORD_EXPIRE_DAYS` | 30 | Días hasta expirar password |
-| `ADMIN_PASSWORD` | (requerido) | Password inicial del admin |
-| `RATE_LIMIT_PER_MINUTE` | 10 | Límite de requests |
-
----
-
-## 🔒 Seguridad
-
-### Características implementadas
-
-1. **JWT Tokens**: Expiran en 7 días
-2. **Password hashing**: bcrypt
-3. **Password expiración**: 30 días (configurable)
-4. **Rate limiting**: 10 req/min por IP
-5. **Logs de auditoría**: Todas las acciones de admin
-6. **Solo admin puede**: Crear usuarios, cambiar passwords, ver auditoría
-
----
-
-## ⚠️ Troubleshooting
-
-### Error: "ollama": "no_models"
-
-El modelo no está descargado. Descargarlo:
-
-```bash
-docker exec ai-api-1 ollama pull qwen:0.5b
-```
-
-### Error: "Password expirada"
-
-```bash
-curl -X PUT http://localhost:8000/auth/password ^
-  -H "Authorization: Bearer TOKEN" ^
+curl -X POST http://localhost:8000/v1/chat/completions ^
   -H "Content-Type: application/json" ^
-  -d "{\"new_password\":\"nueva_password\"}"
-```
-
-### Error: "Rate limit exceeded"
-
-Esperar 1 minuto o aumentar `RATE_LIMIT_PER_MINUTE` en `.env`
-
-### Ver logs para debug
-
-```bash
-docker-compose logs -f api
+  -H "Authorization: Bearer TU_TOKEN" ^
+  -d "{\"messages\":[{\"role\":\"user\",\"content\":\"Crea un hola mundo en Python\"}],\"stream\":true}"
 ```
 
 ---
 
-## 🚢 Producción
+## 🤖 Configurar OpenCode Desktop
 
-### Recomendaciones
+### Opción 1:Archivo local del proyecto
 
-1. **Cambiar SECRET_KEY**: Clave larga y aleatoria
-2. **Cambiar ADMIN_PASSWORD**: Inmediatamente después del primer login
-3. **Configurar.redes**: Exponer puerto 8000
-4. **Backup de data.db**: Hacer backup regularmente
-
-### Puertos expuesta.
-
-Editar `docker-compose.yml`:
-
-```yaml
-ports:
-  - "8000:8000"  # Cambiar a "0.0.0.0:8000:8000" para exponer
-```
-
----
-
-## 🤖 OpenCode Desktop - Configuración
-
-### Configurar OpenCode para conectar a tu API
-
-Edita el archivo `~/.config/opencode/opencode.json`:
+Editá `opencode.json` en la raíz del proyecto:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "disabled_providers": [
-    "ollama-local"
-  ],
-  "model": "mi-api/qwen:0.5b",
+  "model": "retbot/qwen2.5:0.5b",
   "provider": {
-    "mi-api": {
-      "name": "Mi API Local",
+    "retbot": {
+      "name": "Api RETBOT",
       "npm": "@ai-sdk/openai-compatible",
       "options": {
-        "baseURL": "http://localhost:8000"
+        "baseURL": "http://localhost:8000/v1",
+        "apiKey": "eyJhbG...TU_TOKEN..."
       },
       "models": {
-        "qwen:0.5b": {
-          "name": "qwen:0.5b"
+        "qwen2.5:0.5b": {
+          "name": "qwen2.5:0.5b"
         }
+      }
+    }
+  },
+  "agent": {
+    "gentleman": {
+      "prompt": "{file:./AGENTS.md}",
+      "tools": {
+        "edit": true,
+        "write": true,
+        "bash": true,
+        "read": true
+      },
+      "description": "Senior Architect mentor - helpful first, challenging when it matters",
+      "mode": "primary"
+    }
+  }
+}
+```
+
+### Opción 2: Configuración global
+
+Editá `C:\Users\<TU_USUARIO>\.config\opencode\opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "retbot/qwen2.5:0.5b",
+  "provider": {
+    "retbot": {
+      "name": "Api RETBOT",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://192.168.1.X:8000/v1",
+        "apiKey": "eyJhbG...TU_TOKEN..."
       }
     }
   }
 }
 ```
 
-### Para conectar desde otra PC (servidor)
+### ¿Dónde consigo el token?
 
-Cambia `localhost` por la IP del servidor:
+1. Hacé login: `POST /auth/login`
+2. Copiá el `access_token` retornado
+3. Pegalo en `apiKey` del opencode.json
 
-```json
-"baseURL": "http://192.168.1.100:8000"
+⚠️ **El token dura 7 días**. Cuando expire, hacés login de nuevo y actualizás.
+
+---
+
+## ��� Recomendamos Gentle AI
+
+Para una experiencia de AI Coding más completa, te recomendamos:
+
+### **[Gentle AI](https://github.com/Gentleman-Programming/gentle-ai)**
+
+Gentle AI es un framework de desarrollo de AI Agents con:
+- **Arquitectura limpia** - patrones de diseño profesionales
+- **Skills personalizables** - cada fase del desarrollo
+- **Memoria persistente** - remembers decisiones del proyecto
+- **Integración nativa** con OpenCode
+
+```
+# Instalar Gentle AI
+npm install -g gentle-ai
+
+# Iniciar proyecto
+gentle init
 ```
 
-### Endpoints disponibles
+---
 
-| Endpoint | Descripción |
-|----------|-------------|
-| `/v1/chat` | Chat compatible con OpenAI (sin auth requerida) |
-| `/v1/chat/completions` | Chat con autenticación JWT |
+## ⚙️ Configuración
 
-### Probar OpenCode
+### Variables de entorno (.env)
 
-1. Iniciar el contenedor: `docker-compose up -d`
-2. Abrir OpenCode Desktop
-3. Seleccionar modelo `mi-api/qwen:0.5b`
-4. Enviar mensaje: "Hola"
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `PORT` | 8000 | Puerto del servidor |
+| `MODEL_NAME` | qwen2.5:0.5b | Modelo a usar |
+| `MODEL_TYPE` | ollama | Tipo de proveedor |
+| `OLLAMA_URL` | http://localhost:11434 | URL de Ollama |
+| `SECRET_KEY` | (requerido) | Clave JWT |
+| `PASSWORD_EXPIRE_DAYS` | 30 | Expiración password |
+| `ADMIN_PASSWORD` | (requerido) | Password admin |
+| `RATE_LIMIT_PER_MINUTE` | 10 | Límite req/min |
+| `API_KEY` | demo_key_123 | API key para testing |
+
+---
+
+## 🔒 Seguridad
+
+1. **JWT Tokens** - Expiran en 7 días
+2. **Password hashing** - bcrypt
+3. **Password expiración** - 30 días
+4. **Rate limiting** - 10 req/min por IP
+5. **Logs de auditoría** - Todas las acciones
+
+---
+
+## 🐛 Troubleshooting
+
+### Error: "Usuario no encontrado"
+
+El usuario no existe en la DB. Asegurate de:
+1.Tener usuarios creados (admin depuis `/auth/login`)
+2.El token no esté vencido
+
+### Error: "ollama": "disconnected"
+
+Ollama no está corriendo:
+
+```bash
+ollama serve
+ollama pull qwen2.5:0.5b
+```
+
+### Error: "Rate limit exceeded"
+
+Esperar 1 minuto o aumentar `RATE_LIMIT_PER_MINUTE` en `.env`
 
 ---
 
 ## 📄 Licencia
 
 MIT License
+
+---
+
+## 🔗 Links Útiles
+
+- [Ollama](https://ollama.com) - Modelos locales
+- [Can I Run It?](https://www.canirun.ai/) - Compatibilidad de modelos
+- [Gentle AI](https://github.com/Gentleman-Programming/gentle-ai) - Framework de AI Agents
+- [OpenCode](https://opencode.ai) - AI Coding Assistant
