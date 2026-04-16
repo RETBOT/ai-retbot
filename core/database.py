@@ -86,6 +86,30 @@ class AuditLog(Base):
         }
 
 
+class APIKey(Base):
+    """API Keys persistentes para integración con OpenCode y otros clientes"""
+    __tablename__ = "api_keys"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)  # Descripción: "OpenCode Desktop", "CLI", etc.
+    key_hash = Column(String, nullable=False, index=True)  # SHA256 hash de la key
+    permissions = Column(String, default="chat")  # "chat", "chat,admin", etc.
+    is_active = Column(Boolean, default=True)
+    last_used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "permissions": self.permissions,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_used_at": self.last_used_at.isoformat() if self.last_used_at else None,
+        }
+
+
 DATABASE_URL = "sqlite+aiosqlite:///./data.db"
 
 engine = create_async_engine(DATABASE_URL, echo=False)
@@ -96,7 +120,8 @@ async def init_db():
     import os
     os.makedirs(".", exist_ok=True)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        # NOTA: Nunca usar drop_all en producción - borra todos los datos
+        # await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Base de datos inicializada")
 

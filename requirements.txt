@@ -24,3 +24,8 @@ httpx
 pydantic-settings
 python-dateutil
 requests
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov

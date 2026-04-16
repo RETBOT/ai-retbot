@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     # Servidor
     PORT: int = 8000
     
-    # Modelo
-    MODEL_NAME: str = "qwen2.5:0.5b"
+    # Modelo - Llama 3.1 recomendado para function calling
+    MODEL_NAME: str = "llama3.1:8b"
     MODEL_TYPE: str = "ollama"
     OLLAMA_URL: str = "http://localhost:11434"
     OPENCODE_URL: str = "http://localhost:54321"

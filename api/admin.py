@@ -249,5 +249,106 @@ async def get_audit_logs(
     return [AuditLogResponse(**l.to_dict()) for l in logs]
 
 
+@router.post("/setup/opencode")
+async def generate_opencode_config(
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Generar configuración de OpenCode automáticamente.
+    
+    Este endpoint crea una configuración lista para usar con OpenCode,
+    incluyendo la API key del usuario si existe.
+    """
+    from core.database import APIKey
+    from core.models import SYSTEM_PROMPT
+    import hashlib
+    
+    # Buscar API key existente del usuario
+    result = await session.execute(
+        select(APIKey)
+        .where(APIKey.user_id == user.id, APIKey.is_active == True)
+        .order_by(APIKey.created_at.desc())
+    )
+    api_key = result.scalar_one_or_none()
+    
+    # Si no tiene API key, crear una
+    if not api_key:
+        import secrets
+        import uuid
+        
+        random_part = secrets.token_urlsafe(32)
+        api_key_plain = f"rb_{random_part}"
+        key_hash = hashlib.sha256(api_key_plain.encode()).hexdigest()
+        
+        api_key = APIKey(
+            id=str(uuid.uuid4()),
+            user_id=user.id,
+            name="OpenCode Auto-Generated",
+            key_hash=key_hash,
+            permissions="chat",
+            is_active=True
+        )
+        session.add(api_key)
+        await session.commit()
+        await session.refresh(api_key)
+    else:
+        # No podemos recuperar la key en texto plano, instructivo al usuario
+        api_key_plain = "[TU_API_KEY_AQUI - Usa list-api-keys para ver tus keys]"
+    
+    # Detectar URL base
+    host = request.headers.get("host", "localhost:8000")
+    scheme = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
+    base_url = f"{scheme}://{host}/v1"
+    
+    config = {
+        "$schema": "https://opencode.ai/config.json",
+        "model": f"retbot/{settings.MODEL_NAME}",
+        "provider": {
+            "retbot": {
+                "name": "RETBOT",
+                "npm": "@ai-sdk/openai-compatible",
+                "options": {
+                    "baseURL": base_url,
+                    "headers": {
+                        "X-API-Key": api_key_plain if api_key_plain.startswith("rb_") else "[API_KEY]"
+                    }
+                },
+                "models": {
+                    settings.MODEL_NAME: {
+                        "name": settings.MODEL_NAME
+                    }
+                }
+            }
+        },
+        "agent": {
+            "retbot": {
+                "name": "RETBOT",
+                "prompt": SYSTEM_PROMPT[:200] + "...",
+                "description": "Expert AI coding assistant with tool support",
+                "mode": "primary",
+                "tools": {
+                    "read": True,
+                    "write": True,
+                    "edit": True,
+                    "bash": True
+                }
+            }
+        }
+    }
+    
+    return {
+        "message": "Configuración generada exitosamente",
+        "config": config,
+        "instructions": [
+            "1. Copia esta configuración a tu archivo opencode.json",
+            "2. Reemplaza [API_KEY] con tu API key real (usa: python cli/main.py list-api-keys --user {user.username})",
+            "3. Reinicia OpenCode para aplicar los cambios",
+            "4. Alternativa: Guarda como .opencode.json en la raíz de tu proyecto"
+        ]
+    }
+
+
 # Importar settings para PASSWORD_EXPIRE_DAYS
 from core.config import settings

@@ -8,9 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from core.database import Job, get_session, User
-from core.auth import get_current_user, User as AuthUser, decode_token
+from core.auth import get_current_user, User as AuthUser, decode_token, get_user_from_api_key
 from core.config import settings
 from core.models import get_model_provider, SYSTEM_PROMPT
+from core.tools import TOOL_DEFINITIONS, ToolExecutor
 
 router = APIRouter(prefix="/agent", tags=["jobs"])
 
@@ -22,12 +23,19 @@ class ChatMessage(BaseModel):
     content: str
 
 
+class ToolDefinition(BaseModel):
+    type: str = "function"
+    function: dict
+
+
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     model: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     stream: Optional[bool] = False
+    tools: Optional[List[ToolDefinition]] = None
+    tool_choice: Optional[str] = "auto"
 
 
 class OpenAIResponseChoice(BaseModel):
@@ -94,10 +102,17 @@ async def create_chat(
     session: AsyncSession = Depends(get_session),
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    """Endpoint OpenAI-compatible para chat completions"""
+    """Endpoint OpenAI-compatible para chat completions - soporta JWT, API Key y Tools"""
     
-    # Obtener usuario
-    user = await get_user_from_credentials(credentials, session)
+    # Obtener usuario (API Key > JWT > Default)
+    user = None
+    api_key = request.headers.get("X-API-Key")
+    if api_key:
+        user = await get_user_from_api_key(api_key, session)
+    
+    if not user:
+        user = await get_user_from_credentials(credentials, session)
+    
     if not user:
         user = await get_or_create_default_user(session)
     
@@ -115,6 +130,9 @@ async def create_chat(
     model_name = data.model or settings.MODEL_NAME
     model_type = settings.MODEL_TYPE
     
+    # Verificar si se solicitaron tools
+    has_tools = data.tools is not None and len(data.tools) > 0
+    
     # Crear job en la base de datos
     job = Job(
         id=str(uuid.uuid4()),
@@ -130,16 +148,96 @@ async def create_chat(
         job.status = "processing"
         await session.commit()
         
-        # Conectar al modelo real (Ollama o OpenCode)
+        # Preparar mensajes para el modelo
+        messages_for_model = []
+        
+        # Agregar system prompt
+        system_content = SYSTEM_PROMPT
+        if has_tools:
+            from core.tools.definitions import TOOLS_SYSTEM_PROMPT_EXTENSION
+            system_content += TOOLS_SYSTEM_PROMPT_EXTENSION
+        
+        messages_for_model.append({"role": "system", "content": system_content})
+        
+        # Agregar mensajes del usuario
+        for msg in data.messages:
+            messages_for_model.append({"role": msg.role, "content": msg.content})
+        
+        # Si hay tools, agregar instrucciones específicas
+        if has_tools:
+            tools_instruction = """
+When you need to use a tool, respond with a JSON object in this exact format:
+{"tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "tool_name", "arguments": {"arg1": "value1"}}}]}
+
+Available tools:
+"""
+            for tool in TOOL_DEFINITIONS:
+                tools_instruction += f"- {tool['function']['name']}: {tool['function']['description']}\n"
+            
+            messages_for_model.append({"role": "system", "content": tools_instruction})
+        
+        # Llamar al modelo
         provider = get_model_provider(model_name, model_type)
-        result = provider.chat(user_message, SYSTEM_PROMPT)
+        
+        # Para Llama 3.1/3.2, usar el chat normal
+        # (En el futuro podemos usar el formato nativo de tools de Ollama)
+        response_text = provider.chat(
+            message=user_message,
+            system_prompt=system_content
+        )
+        
+        # Intentar parsear si hay tool calls
+        tool_calls = None
+        if has_tools:
+            tool_calls = parse_tool_calls(response_text)
+        
+        # Si hay tool calls, ejecutarlas y hacer segunda llamada
+        if tool_calls:
+            # Ejecutar tools
+            working_dir = request.headers.get("X-Working-Directory", ".")
+            executor = ToolExecutor(working_dir)
+            
+            tool_results = []
+            for tool_call in tool_calls:
+                tool_name = tool_call.get("function", {}).get("name")
+                arguments = tool_call.get("function", {}).get("arguments", {})
+                
+                if isinstance(arguments, str):
+                    import json
+                    try:
+                        arguments = json.loads(arguments)
+                    except:
+                        arguments = {}
+                
+                result = await executor.execute(tool_name, arguments)
+                tool_results.append({
+                    "tool_call_id": tool_call.get("id", "unknown"),
+                    "role": "tool",
+                    "content": result.content if result.success else result.error
+                })
+            
+            # Agregar resultados al contexto y hacer segunda llamada
+            messages_for_model.append({"role": "assistant", "content": response_text})
+            for result in tool_results:
+                messages_for_model.append(result)
+            
+            # Segunda llamada al modelo
+            final_prompt = "\n".join([f"{m['role']}: {m['content']}" for m in messages_for_model])
+            final_response = provider.chat(
+                message="Basándote en los resultados de las tools, proporciona una respuesta final al usuario.",
+                system_prompt=final_prompt
+            )
+            response_text = final_response
         
         job.status = "completed"
-        job.result = result
+        job.result = response_text
         job.completed_at = datetime.utcnow()
+        
     except Exception as e:
         job.status = "failed"
         job.error = str(e)
+        import traceback
+        traceback.print_exc()
     
     await session.commit()
     
@@ -154,6 +252,39 @@ async def create_chat(
             finish_reason="stop"
         )]
     )
+
+
+def parse_tool_calls(response_text: str) -> Optional[list]:
+    """
+    Parsear tool calls desde la respuesta del modelo.
+    
+    Llama 3.1/3.2 puede responder con JSON que contiene tool_calls.
+    Esta función intenta extraerlos.
+    """
+    import json
+    import re
+    
+    # Intentar encontrar JSON con tool_calls
+    # Buscar patrones como {"tool_calls": [...]}
+    pattern = r'\{\s*"tool_calls"\s*:\s*\[.*?\]\s*\}'
+    match = re.search(pattern, response_text, re.DOTALL)
+    
+    if match:
+        try:
+            data = json.loads(match.group())
+            return data.get("tool_calls")
+        except json.JSONDecodeError:
+            pass
+    
+    # Intentar parsear todo el texto como JSON
+    try:
+        data = json.loads(response_text)
+        if "tool_calls" in data:
+            return data["tool_calls"]
+    except json.JSONDecodeError:
+        pass
+    
+    return None
 
 
 # También mantenemos los endpoints originales para compatibilidad

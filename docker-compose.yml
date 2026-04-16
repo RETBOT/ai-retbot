@@ -9,11 +9,13 @@ services:
       - "11434:11434"
     volumes:
       - ./data.db:/app/data.db
+      - ./api:/app/api
+      - ./core:/app/core
     environment:
       - PORT=8000
       - MODEL_NAME=qwen:0.5b
       - MODEL_TYPE=ollama
-      - OLLAMA_URL=http://localhost:11434
+      - OLLAMA_URL=http://127.0.0.1:11434
       - OPENCODE_URL=http://localhost:54321
     env_file:
       - .env

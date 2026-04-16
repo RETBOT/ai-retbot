@@ -5,7 +5,7 @@ import asyncio
 import sys
 from datetime import datetime, timedelta
 
-from core.database import init_db, User, AuditLog, async_session
+from core.database import init_db, User, AuditLog, APIKey, async_session
 from core.auth import hash_password, verify_password, create_access_token
 from sqlalchemy import select
 from core.config import settings
@@ -141,6 +141,93 @@ async def audit_logs(args):
                 print(f"     {log.details}")
 
 
+async def create_api_key(args):
+    """Crear API Key para un usuario"""
+    import secrets
+    import hashlib
+    
+    await init_db()
+    
+    async with async_session() as session:
+        # Buscar usuario
+        result = await session.execute(
+            select(User).where(User.username == args.username)
+        )
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            print(f"❌ Usuario '{args.username}' no encontrado")
+            return
+        
+        # Generar API key aleatoria
+        # Formato: rb_<32 caracteres alphanumeric>
+        random_part = secrets.token_urlsafe(32)
+        api_key = f"rb_{random_part}"
+        
+        # Hashear la key para almacenar
+        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        
+        # Crear registro en DB
+        db_key = APIKey(
+            user_id=user.id,
+            name=args.name,
+            key_hash=key_hash,
+            permissions=args.permissions,
+            is_active=True
+        )
+        session.add(db_key)
+        await session.commit()
+        
+        print(f"✅ API Key creada exitosamente")
+        print(f"\n📝 Detalles:")
+        print(f"   Usuario: {user.username}")
+        print(f"   Nombre: {args.name}")
+        print(f"   Permisos: {args.permissions}")
+        print(f"\n🔑 API Key (¡GUARDÁ ESTO! No se puede ver de nuevo):")
+        print(f"   {api_key}")
+        print(f"\n📋 Para usar con OpenCode, agregá este header:")
+        print(f'   "X-API-Key": "{api_key}"')
+
+
+async def list_api_keys(args):
+    """Listar API Keys de un usuario"""
+    await init_db()
+    
+    async with async_session() as session:
+        # Buscar usuario
+        result = await session.execute(
+            select(User).where(User.username == args.username)
+        )
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            print(f"❌ Usuario '{args.username}' no encontrado")
+            return
+        
+        # Buscar keys
+        result = await session.execute(
+            select(APIKey)
+            .where(APIKey.user_id == user.id)
+            .order_by(APIKey.created_at.desc())
+        )
+        keys = result.scalars().all()
+        
+        if not keys:
+            print(f"No hay API keys para '{args.username}'")
+            return
+        
+        print(f"\n🔑 API Keys de '{args.username}' ({len(keys)}):\n")
+        for k in keys:
+            status = "✅" if k.is_active else "❌"
+            last_used = k.last_used_at.strftime("%Y-%m-%d %H:%M") if k.last_used_at else "Nunca"
+            print(f"  {status} {k.name}")
+            print(f"     ID: {k.id}")
+            print(f"     Permisos: {k.permissions}")
+            print(f"     Último uso: {last_used}")
+            print(f"     Creada: {k.created_at.strftime('%Y-%m-%d %H:%M')}")
+            print()
+
+
 def main():
     parser = argparse.ArgumentParser(description="CLI de administración")
     subparsers = parser.add_subparsers(dest="command", help="Comandos")
@@ -165,6 +252,16 @@ def main():
     # audit-logs
     subparsers.add_parser("audit-logs", help="Ver logs de auditoría")
     
+    # create-api-key
+    p_apikey = subparsers.add_parser("create-api-key", help="Crear API key para usuario")
+    p_apikey.add_argument("--user", required=True, help="Username del usuario")
+    p_apikey.add_argument("--name", required=True, help="Nombre descriptivo (ej: 'OpenCode Desktop')")
+    p_apikey.add_argument("--permissions", default="chat", help="Permisos (default: chat)")
+    
+    # list-api-keys
+    p_listkeys = subparsers.add_parser("list-api-keys", help="Listar API keys de un usuario")
+    p_listkeys.add_argument("--user", required=True, help="Username del usuario")
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -185,6 +282,10 @@ def main():
         asyncio.run(login(args))
     elif args.command == "audit-logs":
         asyncio.run(audit_logs(args))
+    elif args.command == "create-api-key":
+        asyncio.run(create_api_key(args))
+    elif args.command == "list-api-keys":
+        asyncio.run(list_api_keys(args))
     else:
         parser.print_help()
 

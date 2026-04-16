@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from core.config import settings
 from core.database import get_session, User
+from core.auth import get_current_user_or_api_key
 
 router = APIRouter(prefix="/v1")
 
@@ -59,14 +60,40 @@ async def get_or_create_default_user(session: AsyncSession) -> User:
 
 @router.get("/models")
 async def list_models():
-    """Lista de modelos disponibles - compatible con OpenCode"""
+    """Lista de modelos disponibles desde Ollama - compatible con OpenCode"""
+    from core.models import OllamaProvider
+    
+    try:
+        ollama = OllamaProvider()
+        models = ollama.list_models()
+        
+        if models:
+            return {
+                "object": "list",
+                "data": [
+                    {
+                        "id": model.get("name", "unknown"),
+                        "object": "model",
+                        "owned_by": "retbot",
+                        "created": model.get("modified_at", ""),
+                        "context_length": model.get("details", {}).get("context_length", 8192)
+                    }
+                    for model in models
+                ]
+            }
+    except Exception as e:
+        # Si falla, retornar modelo default
+        pass
+    
+    # Fallback: retornar modelo configurado
     return {
         "object": "list",
         "data": [
             {
                 "id": settings.MODEL_NAME,
-                "object": "retbot",
-                "owned_by": "retbot"
+                "object": "model",
+                "owned_by": "retbot",
+                "context_length": 8192
             }
         ]
     }
@@ -86,34 +113,12 @@ async def get_model(model_id: str):
 @router.post("/chat/completions")
 async def chat_completions_streaming(
     request: Request,
-    authorization: str = Header(None),
+    db_user: User = Depends(get_current_user_or_api_key),
     session: AsyncSession = Depends(get_session)
 ):
-    """Streaming endpoint - solo acepta Bearer token del login"""
+    """Streaming endpoint - acepta JWT Bearer token o X-API-Key"""
     
-    from core.auth import decode_token
-    from sqlalchemy import select
-    
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization required")
-    
-    token = authorization.replace("Bearer ", "")
-    
-    # Decodificar token
-    payload = decode_token(token)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Token inválido")
-    
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Token inválido")
-    
-    # Buscar usuario en DB
-    result = await session.execute(select(User).where(User.id == user_id))
-    db_user = result.scalar_one_or_none()
-    
-    if not db_user:
-        raise HTTPException(status_code=401, detail="Usuario no encontrado - haz login primero")
+    # Usuario ya autenticado por la dependencia
     
     body = await request.json()
     messages = body.get("messages", [])

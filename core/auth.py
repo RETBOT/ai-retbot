@@ -117,3 +117,75 @@ async def get_optional_user(
         return await get_current_user(credentials, session)
     except HTTPException:
         return None
+
+
+async def get_user_from_api_key(
+    api_key: str,
+    session: AsyncSession
+) -> Optional[User]:
+    """Validar API key y retornar usuario asociado"""
+    from core.database import APIKey
+    import hashlib
+    
+    if not api_key:
+        return None
+    
+    # Calcular hash de la key
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    
+    # Buscar key en la base de datos
+    result = await session.execute(
+        select(APIKey).where(
+            APIKey.key_hash == key_hash,
+            APIKey.is_active == True
+        )
+    )
+    db_key = result.scalar_one_or_none()
+    
+    if not db_key:
+        return None
+    
+    # Actualizar last_used_at
+    db_key.last_used_at = datetime.utcnow()
+    await session.commit()
+    
+    # Obtener usuario asociado
+    result = await session.execute(
+        select(User).where(User.id == db_key.user_id)
+    )
+    user = result.scalar_one_or_none()
+    
+    if user and not user.is_active:
+        return None
+    
+    return user
+
+
+async def get_current_user_or_api_key(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    session: AsyncSession = Depends(get_session)
+) -> User:
+    """
+    Obtener usuario desde JWT token O desde API Key (header X-API-Key).
+    Primero intenta API Key, luego JWT.
+    """
+    # Intentar API Key primero (header X-API-Key)
+    api_key = request.headers.get("X-API-Key")
+    if api_key:
+        user = await get_user_from_api_key(api_key, session)
+        if user:
+            return user
+    
+    # Fallback a JWT token
+    if credentials:
+        try:
+            return await get_current_user(credentials, session)
+        except HTTPException:
+            pass
+    
+    # Ninguna autenticación válida
+    raise HTTPException(
+        status_code=401,
+        detail="Authentication required. Provide X-API-Key header or Authorization Bearer token."
+    )

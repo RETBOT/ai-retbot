@@ -1,0 +1,35 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "retbot/llama3.1:8b",
+  "provider": {
+    "retbot": {
+      "name": "RETBOT",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://localhost:8000/v1",
+        "headers": {
+          "X-API-Key": "rb_TU_API_KEY_AQUI"
+        }
+      },
+      "models": {
+        "llama3.1:8b": {
+          "name": "llama3.1:8b"
+        }
+      }
+    }
+  },
+  "agent": {
+    "retbot": {
+      "name": "RETBOT",
+      "prompt": "You are RETBOT, an expert AI coding assistant integrated with OpenCode.",
+      "description": "Expert AI coding assistant with filesystem access",
+      "mode": "primary",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    }
+  }
+}
