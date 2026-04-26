@@ -1,0 +1,164 @@
+# ============================================
+# RETBOT - Producción en CentOS (4 CPU, 8GB RAM)
+# ============================================
+# Uso: docker-compose -f docker-compose.prod.yml up -d
+# ============================================
+
+version: '3.8'
+
+services:
+  # ============================================
+  # API - Servidor FastAPI
+  # ============================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: retbot-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Base de datos SQLite
+      - ./data:/app/data
+      # Logs
+      - ./logs:/app/logs
+    environment:
+      # Servidor
+      - PORT=8000
+      
+      # Modelo (CPU-only)
+      - MODEL_NAME=qwen2.5-coder:3b
+      - MODEL_TYPE=ollama
+      - OLLAMA_URL=http://host.docker.internal:11434
+      
+      # Redis (cache)
+      - REDIS_URL=redis://redis:6379
+      
+      # Concurrencia (CPU)
+      - OLLAMA_CONTEXT_LENGTH=4096
+      
+      # Rate limiting
+      - RATE_LIMIT_PER_USER=20
+      - RATE_LIMIT_PER_MINUTE=10
+      - RATE_LIMIT_ENABLED=true
+      
+      # Logging
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      
+      # CORS
+      - ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
+      
+      # Seguridad (del archivo .env)
+      - ADMIN_PASSWORD
+      - SECRET_KEY
+      - API_KEY
+    env_file:
+      - .env
+    extra_hosts:
+      # Para conectar con Ollama en el host
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - retbot-network
+    deploy:
+      resources:
+        limits:
+          cpus: '3.0'
+          memory: 6G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+  # ============================================
+  # Redis - Cache de respuestas
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: retbot-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - retbot-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # ============================================
+  # Nginx - Reverse Proxy (opcional)
+  # ============================================
+  nginx:
+    image: nginx:alpine
+    container_name: retbot-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - retbot-network
+    profiles:
+      - nginx  # Solo se inicia con: docker-compose --profile nginx up -d
+
+networks:
+  retbot-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+
+# ============================================
+# INSTRUCCIONES
+# ============================================
+#
+# 1. Primera vez:
+#    cp .env.example .env
+#    vi .env  # Configurar ADMIN_PASSWORD y SECRET_KEY
+#    docker-compose -f docker-compose.prod.yml up -d
+#
+# 2. Ver logs:
+#    docker-compose -f docker-compose.prod.yml logs -f
+#
+# 3. Health check:
+#    curl http://localhost:8000/health
+#
+# 4. Web UI:
+#    http://TU_IP:8000/admin/ui
+#
+# 5. Con Nginx (puerto 80):
+#    docker-compose -f docker-compose.prod.yml --profile nginx up -d
+#
+# 6. Detener:
+#    docker-compose -f docker-compose.prod.yml down
+#
+# 7. Reiniciar:
+#    docker-compose -f docker-compose.prod.yml restart
+#
+# 8. Ver uso de recursos:
+#    docker stats
+#
+# ============================================
