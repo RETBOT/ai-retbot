@@ -24,6 +24,7 @@ httpx
 pydantic-settings
 python-dateutil
 requests
+psutil
 
 # Testing
 pytest

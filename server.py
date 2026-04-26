@@ -87,56 +87,17 @@ app.include_router(streaming_router)
 
 
 @app.get("/health")
-async def health():
-    from core.models import get_model_provider, OllamaProvider, OpenCodeProvider, MockProvider
-    
-    ollama_status = "disconnected"
-    opencode_status = "disconnected"
-    mock_status = "not_used"
-    
-    from core.config import settings
-    
-    # Si es modo mock, cambiar status
-    if settings.MODEL_TYPE == "mock":
-        mock_status = "active"
-        return {
-            "status": "ok",
-            "model_type": settings.MODEL_TYPE,
-            "model": settings.MODEL_NAME,
-            "mode": "mock",
-            "mock": mock_status,
-            "note": "Modo mock activo - sin Ollama requerido",
-            "ollama": "not_used",
-            "opencode": "not_used"
-        }
-    
-    ollama = OllamaProvider()
-    
-    # Verificar Ollama
-    try:
-        models = ollama.list_models()
-        ollama_status = "connected" if models else "no_models"
-    except Exception as e:
-        ollama_status = f"error: {str(e)}"
-    
-    # Verificar OpenCode
-    try:
-        opencode = OpenCodeProvider()
-        opencode_status = "available" if opencode.is_available() else "not_available"
-    except Exception as e:
-        opencode_status = f"error: {str(e)}"
-    
-    return {
-        "status": "ok",
-        "model_type": settings.MODEL_TYPE,
-        "model": settings.MODEL_NAME,
-        "ollama_url": settings.OLLAMA_URL,
-        "ollama": ollama_status,
-        "opencode": opencode_status,
-        "debug": {
-            "models_found": ollama.list_models() if ollama_status != "error" else []
-        }
-    }
+async def health_simple():
+    """Health check rápido para monitoreo básico"""
+    from core.health import health_check_simple
+    return await health_check_simple()
+
+
+@app.get("/health/full")
+async def health_full():
+    """Health check completo con todos los detalles del sistema"""
+    from core.health import health_check_full
+    return await health_check_full()
 
 
 @app.get("/")
