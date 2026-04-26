@@ -22,6 +22,10 @@ limiter = create_limiter()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Inicializar cache
+    from core.cache import init_cache, close_cache
+    await init_cache(settings.REDIS_URL)
+    
     await init_db()
     logger.info("Base de datos inicializada")
     
@@ -51,6 +55,9 @@ async def lifespan(app: FastAPI):
     logger.info("Aplicación iniciada")
     yield
     logger.info("Aplicación cerrada")
+    
+    # Cerrar cache
+    await close_cache()
 
 
 app = FastAPI(

@@ -13,6 +13,7 @@ from core.config import settings
 from core.models import get_model_provider, SYSTEM_PROMPT
 from core.tools import TOOL_DEFINITIONS, ToolExecutor
 from core.rate_limit import limiter
+from core.cache import cache
 
 router = APIRouter(prefix="/agent", tags=["jobs"])
 
@@ -112,6 +113,31 @@ async def create_chat(
     
     # Verificar si se solicitaron tools
     has_tools = data.tools is not None and len(data.tools) > 0
+    
+    # NO usar cache si hay tools (las herramientas pueden cambiar estado)
+    if not has_tools:
+        # Intentar obtener del cache
+        messages_list = [{"role": msg.role, "content": msg.content} for msg in data.messages]
+        cached_response = await cache.get_response(messages_list, model_name)
+        
+        if cached_response:
+            logger.info(f"✅ CACHE HIT para modelo {model_name}")
+            
+            # Actualizar estadísticas en background
+            stats = await cache.get_stats()
+            logger.debug(f"Cache stats: {stats['hits']} hits, {stats['misses']} misses, {stats['hit_rate_percent']}% hit rate")
+            
+            # Retornar respuesta cacheada
+            return OpenAIResponse(
+                id=f"chatcmpl-cache-{str(uuid.uuid4())[:8]}",
+                created=int(time_module.time()),
+                model=model_name,
+                choices=[OpenAIResponseChoice(
+                    index=0,
+                    message=ChatMessage(role="assistant", content=cached_response.get("content", "")),
+                    finish_reason="stop"
+                )]
+            )
     
     # Crear job en la base de datos
     job = Job(
@@ -215,6 +241,20 @@ Available tools:
         job.status = "completed"
         job.result = response_text
         job.completed_at = datetime.now(timezone.utc)
+        
+        # Guardar en cache (solo si no hay tools)
+        if not has_tools and cache._connected:
+            try:
+                messages_list = [{"role": msg.role, "content": msg.content} for msg in data.messages]
+                await cache.set_response(
+                    messages_list,
+                    model_name,
+                    {"content": response_text},
+                    ttl=3600  # 1 hora
+                )
+                logger.info(f"💾 Respuesta guardada en cache para modelo {model_name}")
+            except Exception as e:
+                logger.warning(f"No se pudo guardar en cache: {e}")
         
     except Exception as e:
         job.status = "failed"
@@ -324,3 +364,25 @@ async def list_jobs(
     )
     jobs = result.scalars().all()
     return [JobResponse(**j.to_dict()) for j in jobs]
+
+
+@router.get("/cache/stats")
+async def get_cache_stats():
+    """Obtener estadísticas del cache de respuestas"""
+    stats = await cache.get_stats()
+    return {
+        "cache": {
+            "enabled": cache._connected,
+            "stats": stats
+        }
+    }
+
+
+@router.post("/cache/clear")
+async def clear_cache():
+    """Limpiar todo el cache de respuestas"""
+    deleted = await cache.clear_all()
+    return {
+        "message": f"Cache limpiado exitosamente",
+        "keys_deleted": deleted
+    }
