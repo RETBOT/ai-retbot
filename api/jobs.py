@@ -14,6 +14,7 @@ from core.models import get_model_provider, SYSTEM_PROMPT
 from core.tools import TOOL_DEFINITIONS, ToolExecutor
 from core.rate_limit import limiter
 from core.cache import cache
+from core.model_manager import model_manager, get_model_for_request, init_model_manager
 
 router = APIRouter(prefix="/agent", tags=["jobs"])
 
@@ -107,8 +108,9 @@ async def create_chat(
     if not user_message:
         raise HTTPException(status_code=400, detail="No se encontró mensaje del usuario")
     
-    # Modelo a usar
-    model_name = data.model or settings.MODEL_NAME
+    # Determinar modelo a usar
+    requested_model = data.model  # Modelo solicitado por el usuario
+    model_name = get_model_for_request(requested_model, task_type="code")
     model_type = settings.MODEL_TYPE
     
     # Verificar si se solicitaron tools
@@ -385,4 +387,36 @@ async def clear_cache():
     return {
         "message": f"Cache limpiado exitosamente",
         "keys_deleted": deleted
+    }
+
+
+@router.get("/models/available")
+async def list_available_models():
+    """Listar modelos disponibles en Ollama"""
+    models = await model_manager.get_available_models(force_refresh=False)
+    return {
+        "models": models,
+        "count": len(models),
+        "default": settings.MODEL_NAME
+    }
+
+
+@router.get("/models/recommend")
+async def recommend_model(task_type: str = "general"):
+    """
+    Recomendar modelo según tipo de tarea.
+    
+    Args:
+        task_type: Tipo de tarea (general, code, chat, fast)
+    """
+    available = await model_manager.get_available_models()
+    recommended = model_manager.select_best_model(task_type=task_type)
+    
+    model_info = model_manager.get_model_info(recommended)
+    
+    return {
+        "task_type": task_type,
+        "recommended": recommended,
+        "info": model_info,
+        "available_count": len(available)
     }

@@ -36,6 +36,10 @@ async def lifespan(app: FastAPI):
     from core.cache import init_cache, close_cache
     await init_cache(settings.REDIS_URL)
     
+    # Inicializar model manager
+    from core.model_manager import init_model_manager
+    await init_model_manager()
+    
     await init_db()
     logger.info("Base de datos inicializada")
     
