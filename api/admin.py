@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy import select, func
@@ -77,8 +77,8 @@ async def create_user(
         password_hash=hash_password(data.password),
         is_admin=data.is_admin,
         is_active=True,
-        password_changed_at=datetime.utcnow(),
-        password_expires_at=datetime.utcnow() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
+        password_changed_at=datetime.now(timezone.utc),
+        password_expires_at=datetime.now(timezone.utc) + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
     )
     session.add(user)
     await session.commit()
@@ -156,8 +156,8 @@ async def update_user(
     if data.password:
         user.password_hash = hash_password(data.password)
         changes.append("password cambiada")
-        user.password_changed_at = datetime.utcnow()
-        user.password_expires_at = datetime.utcnow() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
+        user.password_changed_at = datetime.now(timezone.utc)
+        user.password_expires_at = datetime.now(timezone.utc) + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
     
     # Log de auditoría
     audit = AuditLog(

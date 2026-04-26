@@ -1,6 +1,6 @@
 import secrets
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import bcrypt
 from jose import JWTError, jwt
@@ -14,6 +14,11 @@ from core.config import settings
 logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
+
+
+def _utc_now():
+    """Obtener datetime actual en UTC"""
+    return datetime.now(timezone.utc)
 
 
 def hash_password(password: str) -> str:
@@ -33,7 +38,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Crear JWT token"""
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(days=1))
+    expire = _utc_now() + (expires_delta or timedelta(days=1))
     # Exp debe ser integer (Unix timestamp), no string
     to_encode.update({"exp": int(expire.timestamp())})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
@@ -66,7 +71,15 @@ def is_password_expired(user: User) -> bool:
     """Verificar si password expiró"""
     if user.password_expires_at is None:
         return False
-    return datetime.utcnow() > user.password_expires_at
+    
+    # Asegurar que ambos tengan timezone para comparar
+    expires_at = user.password_expires_at
+    if expires_at.tzinfo is None:
+        # naive datetime - asumir UTC
+        from datetime import timezone
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    
+    return datetime.now(timezone.utc) > expires_at
 
 
 async def get_current_user(
@@ -146,7 +159,7 @@ async def get_user_from_api_key(
         return None
     
     # Actualizar last_used_at
-    db_key.last_used_at = datetime.utcnow()
+    db_key.last_used_at = datetime.now(timezone.utc)
     await session.commit()
     
     # Obtener usuario asociado

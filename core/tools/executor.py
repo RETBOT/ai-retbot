@@ -35,13 +35,17 @@ class ToolExecutor:
     """
     
     # Comandos permitidos (whitelist) para execute_command
+    # Incluye variantes Unix Y Windows para compatibilidad cross-platform
     ALLOWED_COMMANDS = {
-        # File operations
+        # File operations - Unix
         'ls', 'dir', 'cat', 'type', 'head', 'tail', 'wc', 'find',
         # Navigation
         'pwd', 'cd', 'echo',
+        # File operations - Windows
+        'del', 'rmdir', 'move', 'copy', 'move-Item', 'copy-Item',
+        'Remove-Item', 'New-Item', 'Get-Content', 'Set-Content',
         # Python
-        'python', 'python3', 'pip', 'pip3', 'pytest',
+        'python', 'python3', 'pip', 'pip3', 'pytest', 'py',
         # Node.js
         'node', 'npm', 'npx', 'yarn',
         # Git

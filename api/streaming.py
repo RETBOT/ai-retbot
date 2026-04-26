@@ -5,7 +5,7 @@ Usa httpx directo para streaming SSE como el ejemplo ai-ejemplo
 import uuid
 import json
 import httpx
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Request, Header
 from fastapi.responses import StreamingResponse
@@ -13,8 +13,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from core.config import settings
-from core.database import get_session, User
+from core.database import get_session, User, get_or_create_default_user
 from core.auth import get_current_user_or_api_key
+from core.rate_limit import limiter
 
 router = APIRouter(prefix="/v1")
 
@@ -34,28 +35,6 @@ class ChatRequest(BaseModel):
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     stream: bool = False
-
-
-async def get_or_create_default_user(session: AsyncSession) -> User:
-    """Obtener o crear usuario default"""
-    result = await session.execute(select(User).where(User.username == "default"))
-    user = result.scalar_one_or_none()
-    
-    if not user:
-        import hashlib
-        default_password = hashlib.sha256(b"default").hexdigest()
-        user = User(
-            id=str(uuid.uuid4()),
-            username="default",
-            password_hash=default_password,
-            is_active=True,
-            is_admin=False,
-            password_changed_at=datetime.utcnow()
-        )
-        session.add(user)
-        await session.commit()
-    
-    return user
 
 
 @router.get("/models")
@@ -111,6 +90,7 @@ async def get_model(model_id: str):
 
 
 @router.post("/chat/completions")
+@limiter.limit(f"{settings.RATE_LIMIT_PER_USER}/minute")
 async def chat_completions_streaming(
     request: Request,
     db_user: User = Depends(get_current_user_or_api_key),
@@ -176,7 +156,11 @@ async def chat_completions_streaming(
 
                     try:
                         data = json.loads(line)
-                    except:
+                    except json.JSONDecodeError:
+                        # Línea vacía o no es JSON, continuar
+                        continue
+                    except Exception as e:
+                        logger.warning(f"Error parseando respuesta SSE: {e}")
                         continue
 
                     content = data.get("message", {}).get("content", "")

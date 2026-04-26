@@ -1,21 +1,23 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-limiter = Limiter(key_func=get_remote_address)
-
 from core.config import settings
 from core.database import init_db, User
 from core.auth import hash_password
+from core.rate_limit import create_limiter
+
+# Crear limiter configurado para rate limiting por usuario
+limiter = create_limiter()
 
 
 @asynccontextmanager
@@ -37,8 +39,8 @@ async def lifespan(app: FastAPI):
                 password_hash=hash_password(settings.ADMIN_PASSWORD),
                 is_admin=True,
                 is_active=True,
-                password_changed_at=datetime.utcnow(),
-                password_expires_at=datetime.utcnow() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
+                password_changed_at=datetime.now(timezone.utc),
+                password_expires_at=datetime.now(timezone.utc) + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
             )
             session.add(admin)
             await session.commit()
@@ -58,12 +60,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Configurar rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# CORS: permitir todos si ALLOWED_ORIGINS=*, si no usar la lista configurada
+cors_origins = ["*"] if settings.ALLOWED_ORIGINS == "*" else settings.cors_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -82,10 +88,27 @@ app.include_router(streaming_router)
 
 @app.get("/health")
 async def health():
-    from core.models import get_model_provider, OllamaProvider, OpenCodeProvider
+    from core.models import get_model_provider, OllamaProvider, OpenCodeProvider, MockProvider
     
     ollama_status = "disconnected"
     opencode_status = "disconnected"
+    mock_status = "not_used"
+    
+    from core.config import settings
+    
+    # Si es modo mock, cambiar status
+    if settings.MODEL_TYPE == "mock":
+        mock_status = "active"
+        return {
+            "status": "ok",
+            "model_type": settings.MODEL_TYPE,
+            "model": settings.MODEL_NAME,
+            "mode": "mock",
+            "mock": mock_status,
+            "note": "Modo mock activo - sin Ollama requerido",
+            "ollama": "not_used",
+            "opencode": "not_used"
+        }
     
     ollama = OllamaProvider()
     
@@ -103,7 +126,6 @@ async def health():
     except Exception as e:
         opencode_status = f"error: {str(e)}"
     
-    from core.config import settings
     return {
         "status": "ok",
         "model_type": settings.MODEL_TYPE,

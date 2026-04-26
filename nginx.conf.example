@@ -1,0 +1,123 @@
+# ============================================
+# Nginx Load Balancer para Múltiples Ollamas
+# ============================================
+# Usar cuando tengas 2-3 GPUs corriendo instancias separadas
+# ============================================
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    # ============================================
+    # Upstream - Definir backends de Ollama
+    # ============================================
+    upstream ollama_backends {
+        # Algoritmo: least_conn (recomendado para cargas variables)
+        least_conn;
+        
+        # Instancia 1 - GPU 0
+        server localhost:11434 max_fails=3 fail_timeout=30s weight=1;
+        
+        # Instancia 2 - GPU 1
+        server localhost:11435 max_fails=3 fail_timeout=30s weight=1;
+        
+        # Instancia 3 - GPU 2
+        server localhost:11436 max_fails=3 fail_timeout=30s weight=1;
+        
+        # Keepalive connections para mejor performance
+        keepalive 32;
+    }
+
+    # ============================================
+    # Servidor principal
+    # ============================================
+    server {
+        listen 11434;
+        server_name _;
+
+        # Logging
+        access_log /var/log/nginx/ollama_access.log;
+        error_log /var/log/nginx/ollama_error.log;
+
+        # ============================================
+        # Timeouts - Ajustar según necesidad
+        # ============================================
+        # Ollama puede tardar en generar respuestas largas
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+
+        location / {
+            proxy_pass http://ollama_backends;
+            
+            # Headers importantes
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Para streaming SSE
+            proxy_buffering off;
+            proxy_cache off;
+            chunked_transfer_encoding off;
+            
+            # WebSocket support (si aplica)
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+
+        # ============================================
+        # Health check endpoint
+        # ============================================
+        location /health {
+            proxy_pass http://ollama_backends/api/tags;
+            proxy_set_header Host $host;
+        }
+
+        # ============================================
+        # Stats endpoint (opcional, requiere nginx plus)
+        # ============================================
+        # location /nginx_status {
+        #     stub_status on;
+        #     allow 127.0.0.1;
+        #     deny all;
+        # }
+    }
+
+    # ============================================
+    # Rate limiting (opcional)
+    # ============================================
+    # limit_req_zone $binary_remote_addr zone=ollama_limit:10m rate=10r/s;
+    #
+    # server {
+    #     location / {
+    #         limit_req zone=ollama_limit burst=20 nodelay;
+    #         ...
+    #     }
+    # }
+}
+
+# ============================================
+# INSTRUCCIONES DE USO
+# ============================================
+#
+# 1. Copiar este archivo a /etc/nginx/nginx.conf
+#    o montarlo como volumen en Docker
+#
+# 2. Iniciar Nginx:
+#    sudo systemctl restart nginx
+#    # o en Docker:
+#    docker run -d -p 11434:11434 -v ./nginx.conf:/etc/nginx/nginx.conf nginx:alpine
+#
+# 3. Verificar configuración:
+#    sudo nginx -t
+#
+# 4. Ver logs en tiempo real:
+#    sudo tail -f /var/log/nginx/ollama_access.log
+#
+# 5. Verificar distribución de carga:
+#    watch -n 1 'curl -s http://localhost:11434/api/tags | jq'
+#
+# ============================================

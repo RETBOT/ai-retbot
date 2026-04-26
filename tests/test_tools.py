@@ -191,7 +191,8 @@ async def test_execute_command_not_allowed():
     
     with tempfile.TemporaryDirectory() as tmpdir:
         executor = ToolExecutor(tmpdir)
-        result = await executor.execute_command("rm -rf /")
+        # Usar un comando que NO está en el whitelist
+        result = await executor.execute_command("sudo rm -rf /")
         
         assert result.success is False
         assert "no está permitido" in result.error.lower() or "not allowed" in result.error.lower()

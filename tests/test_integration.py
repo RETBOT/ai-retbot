@@ -144,7 +144,7 @@ async def test_full_api_key_workflow(client, db_session):
     import hashlib
     from core.database import APIKey, User
     from core.auth import hash_password
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     from core.config import settings
     import uuid
     
@@ -154,8 +154,8 @@ async def test_full_api_key_workflow(client, db_session):
         username="testworkflow",
         password_hash=hash_password("testpass"),
         is_active=True,
-        password_changed_at=datetime.utcnow(),
-        password_expires_at=datetime.utcnow() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
+        password_changed_at=datetime.now(timezone.utc),
+        password_expires_at=datetime.now(timezone.utc) + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
     )
     db_session.add(user)
     await db_session.commit()

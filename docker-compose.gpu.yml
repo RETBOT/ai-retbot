@@ -1,0 +1,133 @@
+# ============================================
+# RETBOT - Docker Compose para Producción con GPU
+# ============================================
+# Usar con: docker compose -f docker-compose.gpu.yml up -d
+# Requiere: NVIDIA Docker Toolkit instalado
+# ============================================
+
+version: '3.8'
+
+services:
+  # ============================================
+  # Ollama - Servidor de LLM
+  # ============================================
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      # ============================================
+      # CONFIGURACIÓN DE CONCURRENCIA
+      # ============================================
+      # Ajustar según tu hardware:
+      
+      # 1 GPU 4090 + modelo 14b:
+      - OLLAMA_NUM_PARALLEL=4
+      # 1 GPU 4090 + modelo 32b:
+      # - OLLAMA_NUM_PARALLEL=2
+      # 2 GPUs 4090:
+      # - OLLAMA_NUM_PARALLEL=8
+      # 3 GPUs 4090:
+      # - OLLAMA_NUM_PARALLEL=12
+      
+      # Máximo de modelos cargados simultáneamente
+      - OLLAMA_MAX_LOADED_MODELS=2
+      
+      # Longitud de contexto (tokens)
+      - OLLAMA_CONTEXT_LENGTH=8192
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # ============================================
+  # RETBOT API - Servidor FastAPI
+  # ============================================
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data.db:/app/data.db
+      - ./api:/app/api
+      - ./core:/app/core
+    environment:
+      - PORT=8000
+      # ============================================
+      # CONFIGURACIÓN DE MODELO
+      # ============================================
+      # 1 GPU 4090:
+      - MODEL_NAME=qwen2.5-coder:14b
+      # 2-3 GPUs 4090:
+      # - MODEL_NAME=qwen2.5-coder:32b
+      
+      - MODEL_TYPE=ollama
+      # Apunta al servicio ollama dentro de Docker
+      - OLLAMA_URL=http://ollama:11434
+      - OPENCODE_URL=http://localhost:54321
+    env_file:
+      - .env
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # ============================================
+  # Redis - Opcional (para colas y cache)
+  # ============================================
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   command: redis-server --appendonly yes
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+  #   restart: unless-stopped
+
+volumes:
+  ollama_data:
+  # redis_data:
+
+# ============================================
+# INSTRUCCIONES DE USO
+# ============================================
+#
+# 1. Iniciar servicios:
+#    docker compose -f docker-compose.gpu.yml up -d
+#
+# 2. Ver logs:
+#    docker compose -f docker-compose.gpu.yml logs -f
+#
+# 3. Descargar modelo:
+#    docker exec -it ollama ollama pull qwen2.5-coder:14b
+#
+# 4. Detener servicios:
+#    docker compose -f docker-compose.gpu.yml down
+#
+# 5. Ver estado de GPUs:
+#    nvidia-smi
+#
+# ============================================

@@ -19,7 +19,14 @@ class OllamaProvider:
         try:
             response = requests.get(f"{self.url}/api/tags", timeout=5)
             return response.status_code == 200
-        except:
+        except requests.exceptions.ConnectionError:
+            logger.warning(f"No se pudo conectar a Ollama en {self.url}")
+            return False
+        except requests.exceptions.Timeout:
+            logger.warning(f"Timeout al conectar a Ollama en {self.url}")
+            return False
+        except Exception as e:
+            logger.warning(f"Error verificando disponibilidad de Ollama: {e}")
             return False
     
     def download_model(self) -> bool:
@@ -114,7 +121,8 @@ class OllamaProvider:
             response.raise_for_status()
             data = response.json()
             return data.get("models", [])
-        except:
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Error listando modelos de Ollama: {e}")
             return []
 
 
@@ -151,7 +159,11 @@ class OpenCodeProvider:
                 server_url=self.url
             ))
             return client.list_tools()
-        except:
+        except ImportError:
+            logger.warning("opencode-agent-sdk no está instalado")
+            return []
+        except Exception as e:
+            logger.warning(f"Error listando tools de OpenCode: {e}")
             return []
     
     def is_available(self) -> bool:
@@ -170,11 +182,95 @@ def get_model_provider(model_name: Optional[str] = None, model_type: Optional[st
     
     if mtype == "opencode":
         return OpenCodeProvider(name.replace("opencode:", "") if name.startswith("opencode:") else name)
+    elif mtype == "mock":
+        # Modo mock para pruebas sin Ollama (equipos limitados)
+        return MockProvider(name.replace("mock:", "") if name.startswith("mock:") else name)
     elif mtype == "ollama":
         return OllamaProvider(name.replace("ollama/", "") if name.startswith("ollama/") else name)
     else:
         # Por defecto Ollama
         return OllamaProvider(name)
+
+
+class MockProvider:
+    """Proveedor mock para pruebas sin Ollama.
+    
+    Útil para:
+    - Pruebas locales en equipos limitado
+    - Testing CI/CD sin dependencia de Ollama
+    - Desarrollo cuando Ollama no está disponible
+    
+    Usage:
+        MODEL_NAME=mock
+        MODEL_TYPE=mock
+    """
+    
+    def __init__(self, model_name: str = "mock"):
+        self.model_name = model_name or "mock"
+        
+    def is_available(self) -> bool:
+        """Siempre disponible en modo mock"""
+        return True
+    
+    def list_models(self) -> list:
+        """Retorna modelo mock"""
+        return [{"name": self.model_name, "modified_at": "2024-01-01"}]
+    
+    def chat(self, message: str, system_prompt: Optional[str] = None) -> str:
+        """Responde con respuestas predefinidas basadas en palabras clave"""
+        message_lower = message.lower()
+        
+        # Respuestas basadas en palabras clave del mensaje
+        responses = [
+            # Keywords that might be in the message -> response
+            ("hola", "hello", "hi", "hey", "Buenos días", "Qué onda"),
+            "¡Hola! Soy el asistente en modo mock. ¿En qué puedo ayudarte hoy?",
+            
+            ("read", "leer", "archivo"),
+            "Para leer un archivo, usaría la herramienta read_file con la ruta del archivo que deseas leer.",
+            
+            ("write", "escribir", "crear archivo"),
+            "Para crear un archivo, usaría write_file especificando la ruta y el contenido.",
+            
+            ("edit", "editar", "modificar"),
+            "Para modificar un archivo, usaría edit_file con el path, old_string y new_string.",
+            
+            ("test", "pytest", "prueba"),
+            "Para ejecutar pruebas, usaría: pytest tests/ -v o el comando específico que necesites.",
+            
+            ("git", "commit", "push"),
+            "Para git,常见的 comandos son: git status, git add, git commit -m 'msg', git push.",
+            
+            ("error", "bug", "falla"),
+            "Parece que hay un error. ¿Podrías mostrarme el mensaje de error completo?",
+            
+            ("help", "ayuda", "comandos"),
+            "Mis herramientas disponibles son: read_file, write_file, edit_file, list_directory, execute_command.",
+        ]
+        
+        # Buscar coincidencia
+        for i in range(0, len(responses), 2):
+            keywords = responses[i]
+            response = responses[i + 1]
+            
+            if isinstance(keywords, str):
+                keywords = (keywords,)
+            
+            for kw in keywords:
+                if kw in message_lower:
+                    return f"[MOCK - {self.model_name}] {response}"
+        
+        # Respuesta por defecto
+        return (
+            f"[MOCK - {self.model_name}] "
+            f"Entendí tu mensaje: '{message[:100]}...'. "
+            f"En un entorno real, procesaría esto con Ollama y las tools disponibles. "
+            f"¿Necesitas ayuda con algo específico?"
+        )
+    
+    async def chat_async(self, message: str, system_prompt: Optional[str] = None) -> str:
+        """Versión async"""
+        return self.chat(message, system_prompt)
 
 
 # Prompt del sistema por defecto - OPTIMIZED FOR OPENCODE

@@ -7,6 +7,7 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import delete
 
 from core.database import Base, get_session
 from server import app
@@ -20,7 +21,7 @@ pytest_plugins = ('pytest_asyncio',)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 def event_loop():
     """Crear event loop para tests async"""
     loop = asyncio.get_event_loop_policy().new_event_loop()
@@ -28,18 +29,18 @@ def event_loop():
     loop.close()
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def engine():
-    """Crear engine de base de datos para tests"""
+    """Crear engine de base de datos para cada test (aislamiento)"""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     
-    # Crear tablas
+    # Crear tablas para cada test
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     
     yield engine
     
-    # Cleanup
+    # Cleanup - borrar todas las tablas después de cada test
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
@@ -68,7 +69,12 @@ async def client(db_session):
     
     app.dependency_overrides[get_session] = override_get_session
     
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    # Usar headers para simular requests con Origin válida para tests
+    async with AsyncClient(
+        app=app, 
+        base_url="http://test",
+        headers={"Origin": "http://localhost:3000"}
+    ) as ac:
         yield ac
     
     # Limpiar overrides
@@ -80,7 +86,7 @@ async def test_user(db_session):
     """Crear un usuario de prueba"""
     from core.database import User
     from core.auth import hash_password
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     from core.config import settings
     import uuid
     
@@ -90,8 +96,8 @@ async def test_user(db_session):
         password_hash=hash_password("testpass123"),
         is_admin=False,
         is_active=True,
-        password_changed_at=datetime.utcnow(),
-        password_expires_at=datetime.utcnow() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
+        password_changed_at=datetime.now(timezone.utc),
+        password_expires_at=datetime.now(timezone.utc) + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
     )
     
     db_session.add(user)
@@ -116,8 +122,8 @@ async def test_admin(db_session):
         password_hash=hash_password("adminpass123"),
         is_admin=True,
         is_active=True,
-        password_changed_at=datetime.utcnow(),
-        password_expires_at=datetime.utcnow() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
+        password_changed_at=datetime.now(timezone.utc),
+        password_expires_at=datetime.now(timezone.utc) + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
     )
     
     db_session.add(user)

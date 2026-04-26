@@ -1,3 +1,9 @@
+# ============================================
+# RETBOT - Docker Compose para Desarrollo
+# ============================================
+# Para producción con GPUs, usar docker-compose.gpu.yml
+# ============================================
+
 version: '3.8'
 
 services:
@@ -5,23 +11,57 @@ services:
     build: .
     ports:
       - "8000:8000"
-      - "4010:4010"
-      - "11434:11434"
     volumes:
       - ./data.db:/app/data.db
       - ./api:/app/api
       - ./core:/app/core
     environment:
       - PORT=8000
-      - MODEL_NAME=qwen:0.5b
+      # Modelo para CPU (cambiar cuando tengas GPU)
+      - MODEL_NAME=qwen2.5-coder:3b
       - MODEL_TYPE=ollama
-      - OLLAMA_URL=http://127.0.0.1:11434
+      # En desarrollo, Ollama corre en host
+      - OLLAMA_URL=http://host.docker.internal:11434
       - OPENCODE_URL=http://localhost:54321
     env_file:
       - .env
+    extra_hosts:
+      # Para que el contenedor pueda acceder a Ollama en el host
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # ============================================
+  # Ollama - Opcional (comentar si corre en host)
+  # ============================================
+  # Para producción con GPU, descomentar y configurar:
+  #
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   environment:
+  #     - OLLAMA_NUM_PARALLEL=4
+  #     - OLLAMA_MAX_LOADED_MODELS=2
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   healthcheck:
+  #     test: ["CMD", "ollama", "list"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 60s
+
+# volumes:
+#   ollama_data:

@@ -1,8 +1,8 @@
 import uuid
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, Enum, ForeignKey, create_engine
+from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, Enum, ForeignKey, create_engine, select
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from core.config import settings
@@ -10,6 +10,11 @@ from core.config import settings
 logger = logging.getLogger(__name__)
 
 Base = declarative_base()
+
+
+def _utc_now():
+    """Obtener datetime actual en UTC (timezone-aware para Python 3.12+)"""
+    return datetime.now(timezone.utc)
 
 
 class User(Base):
@@ -20,10 +25,10 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     is_admin = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
-    password_changed_at = Column(DateTime, default=datetime.utcnow)
-    password_expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    password_changed_at = Column(DateTime, default=_utc_now)
+    password_expires_at = Column(DateTime, default=lambda: datetime.now(timezone.utc) + timedelta(days=settings.PASSWORD_EXPIRE_DAYS))
+    created_at = Column(DateTime, default=_utc_now)
+    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now)
     
     def to_dict(self):
         return {
@@ -139,10 +144,33 @@ async def create_admin_user(username: str, password_hash: str) -> User:
             password_hash=password_hash,
             is_admin=True,
             is_active=True,
-            password_changed_at=datetime.utcnow(),
-            password_expires_at=datetime.utcnow() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
+            password_changed_at=_utc_now(),
+            password_expires_at=_utc_now() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
         )
         session.add(user)
         await session.commit()
         await session.refresh(user)
         return user
+
+
+async def get_or_create_default_user(session: AsyncSession) -> User:
+    """Obtener o crear usuario default para requests sin auth"""
+    result = await session.execute(select(User).where(User.username == "default"))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        import hashlib
+        # Simple hash para testing - en producción usar bcrypt
+        default_password = hashlib.sha256(b"default").hexdigest()
+        user = User(
+            id=str(uuid.uuid4()),
+            username="default",
+            password_hash=default_password,
+            is_active=True,
+            is_admin=False,
+            password_changed_at=_utc_now()
+        )
+        session.add(user)
+        await session.commit()
+    
+    return user

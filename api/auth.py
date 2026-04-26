@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy import select
@@ -69,7 +69,7 @@ async def login(request: LoginRequest, req: Request, session: AsyncSession = Dep
     
     return LoginResponse(
         access_token=access_token,
-        expires_at=(datetime.utcnow() + expires_delta).isoformat()
+        expires_at=(datetime.now(timezone.utc) + expires_delta).isoformat()
     )
 
 
@@ -97,8 +97,8 @@ async def change_password(
     
     # Hash nueva password
     user.password_hash = hash_password(data.new_password)
-    user.password_changed_at = datetime.utcnow()
-    user.password_expires_at = datetime.utcnow() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
+    user.password_changed_at = datetime.now(timezone.utc)
+    user.password_expires_at = datetime.now(timezone.utc) + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
     
     # Guardar
     session.add(user)

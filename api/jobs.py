@@ -1,17 +1,18 @@
 import uuid
 import time as time_module
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
-from core.database import Job, get_session, User
+from core.database import Job, get_session, User, get_or_create_default_user
 from core.auth import get_current_user, User as AuthUser, decode_token, get_user_from_api_key
 from core.config import settings
 from core.models import get_model_provider, SYSTEM_PROMPT
 from core.tools import TOOL_DEFINITIONS, ToolExecutor
+from core.rate_limit import limiter
 
 router = APIRouter(prefix="/agent", tags=["jobs"])
 
@@ -66,36 +67,15 @@ async def get_user_from_credentials(
         if user_id:
             result = await session.execute(select(User).where(User.id == user_id))
             return result.scalar_one_or_none()
-    except:
-        pass
+    except Exception as e:
+        # Token inválido o expirado - retornar None y dejar que use otro método
+        logger.debug(f"Token inválido o error: {e}")
     
     return None
 
 
-async def get_or_create_default_user(session: AsyncSession) -> User:
-    """Obtener o crear usuario default"""
-    result = await session.execute(select(User).where(User.username == "default"))
-    user = result.scalar_one_or_none()
-    
-    if not user:
-        import hashlib
-        # Simple hash para testing - en producción usar bcrypt
-        default_password = hashlib.sha256(b"default").hexdigest()
-        user = User(
-            id=str(uuid.uuid4()),
-            username="default",
-            password_hash=default_password,
-            is_active=True,
-            is_admin=False,
-            password_changed_at=datetime.utcnow()
-        )
-        session.add(user)
-        await session.commit()
-    
-    return user
-
-
 @router.post("/chat/completions", response_model=OpenAIResponse)
+@limiter.limit(f"{settings.RATE_LIMIT_PER_USER}/minute")
 async def create_chat(
     data: ChatRequest,
     request: Request,
@@ -206,7 +186,10 @@ Available tools:
                     import json
                     try:
                         arguments = json.loads(arguments)
-                    except:
+                    except json.JSONDecodeError:
+                        arguments = {}
+                    except Exception as e:
+                        logger.warning(f"Error parseando argumentos de tool: {e}")
                         arguments = {}
                 
                 result = await executor.execute(tool_name, arguments)
@@ -231,7 +214,7 @@ Available tools:
         
         job.status = "completed"
         job.result = response_text
-        job.completed_at = datetime.utcnow()
+        job.completed_at = datetime.now(timezone.utc)
         
     except Exception as e:
         job.status = "failed"

@@ -75,12 +75,52 @@ RETBOT es tu asistente de programación local, diseñado específicamente para i
 
 ### Hardware Recomendado
 
-| Componente | Mínimo | Recomendado | Óptimo |
-|-----------|--------|-------------|--------|
-| **RAM** | 8GB | 16GB | 32GB |
-| **VRAM (GPU)** | - | 8GB | 16GB+ |
-| **Disco** | 10GB | 30GB | 50GB |
-| **CPU** | 4 cores | 8 cores | 16 cores |
+#### Sin GPU (CPU-only)
+
+| Componente | Mínimo | Recomendado |
+|-----------|--------|-------------|
+| **RAM** | 16GB | 32GB |
+| **Disco** | 10GB SSD | 30GB SSD |
+| **CPU** | 4 cores | 8 cores |
+| **Usuarios** | 1-2 | 2-3 |
+
+> ⚠️ **Nota:** Sin GPU, la inferencia es lenta (~1-3 tokens/segundo). Solo recomendado para desarrollo y testing.
+
+#### 1 GPU RTX 4090 (24GB VRAM)
+
+| Componente | Configuración |
+|-----------|---------------|
+| **RAM** | 32GB |
+| **VRAM** | 24GB |
+| **Disco** | 50GB SSD |
+| **CPU** | 8 cores |
+| **Usuarios** | 4-7 concurrentes |
+| **Modelo** | qwen2.5-coder:14b o 32b |
+| **Throughput** | ~15-25 tok/s |
+
+#### 2 GPUs RTX 4090 (48GB VRAM)
+
+| Componente | Configuración |
+|-----------|---------------|
+| **RAM** | 64GB |
+| **VRAM** | 48GB (24GB × 2) |
+| **Disco** | 100GB SSD |
+| **CPU** | 12 cores |
+| **Usuarios** | 8-15 concurrentes |
+| **Modelo** | qwen2.5-coder:32b |
+| **Throughput** | ~30-50 tok/s |
+
+#### 3 GPUs RTX 4090 (72GB VRAM)
+
+| Componente | Configuración |
+|-----------|---------------|
+| **RAM** | 64GB+ |
+| **VRAM** | 72GB (24GB × 3) |
+| **Disco** | 100GB SSD |
+| **CPU** | 16 cores |
+| **Usuarios** | 15-30 concurrentes |
+| **Modelo** | qwen2.5-coder:32b |
+| **Throughput** | ~50-80 tok/s |
 
 ### Software
 
@@ -92,6 +132,17 @@ RETBOT es tu asistente de programación local, diseñado específicamente para i
 
 Para **Function Calling** (tools), estos modelos funcionan mejor:
 
+#### Modelos para Programación (Recomendados)
+
+| Modelo | Tamaño | VRAM (Q4) | Function Calling | Notas |
+|--------|--------|-----------|------------------|-------|
+| **qwen2.5-coder:7b** | ~5GB | 6GB | ✅ **Excelente** | Mejor balance calidad/velocidad |
+| **qwen2.5-coder:14b** | ~9GB | 12GB | ✅ **Excelente** | Recomendado para 1 GPU |
+| **qwen2.5-coder:32b** | ~20GB | 24GB | ✅ **Excelente** | Mejor calidad, requiere RTX 4090 |
+| **qwen2.5-coder:3b** | ~2GB | 4GB | ✅ Bueno | Para CPU o GPUs pequeñas |
+
+#### Modelos Generales
+
 | Modelo | Tamaño | VRAM | Function Calling | Notas |
 |--------|--------|------|------------------|-------|
 | **llama3.1:8b** | ~4.7GB | 6GB | ✅ **Excelente** | Recomendado por defecto |
@@ -101,6 +152,171 @@ Para **Function Calling** (tools), estos modelos funcionan mejor:
 | phi3:medium | ~4GB | 6GB | ⚠️ Parcial | Limitado |
 
 > **⚠️ Importante:** Modelos menores a 7B (como tinyllama, phi3:mini) **NO** funcionan bien con function calling. Usar únicamente para chat simple.
+
+---
+
+## 🎯 Configuración por Hardware
+
+### Sin GPU (CPU-only)
+
+```bash
+# .env
+MODEL_NAME=qwen2.5-coder:3b
+# OLLAMA_NUM_PARALLEL=   # COMENTAR - usar default
+OLLAMA_CONTEXT_LENGTH=4096
+```
+
+**Rendimiento esperado:**
+- 1-2 usuarios concurrentes
+- ~1-3 tokens/segundo
+- Ideal para desarrollo y testing
+
+### 1 GPU RTX 4090 (24GB VRAM)
+
+```bash
+# .env
+MODEL_NAME=qwen2.5-coder:14b      # o qwen2.5-coder:32b
+OLLAMA_NUM_PARALLEL=4              # 2 si usas 32b
+OLLAMA_CONTEXT_LENGTH=8192
+```
+
+**Rendimiento esperado:**
+- 4-7 usuarios concurrentes (14b)
+- 2-4 usuarios concurrentes (32b)
+- ~15-25 tokens/segundo
+
+### 2 GPUs RTX 4090 (48GB VRAM total)
+
+```bash
+# .env
+MODEL_NAME=qwen2.5-coder:32b
+OLLAMA_NUM_PARALLEL=8
+OLLAMA_CONTEXT_LENGTH=8192
+CUDA_VISIBLE_DEVICES=0,1
+```
+
+**Rendimiento esperado:**
+- 8-15 usuarios concurrentes
+- ~30-50 tokens/segundo
+
+### 3 GPUs RTX 4090 (72GB VRAM total)
+
+```bash
+# .env
+MODEL_NAME=qwen2.5-coder:32b
+OLLAMA_NUM_PARALLEL=12
+OLLAMA_CONTEXT_LENGTH=8192
+CUDA_VISIBLE_DEVICES=0,1,2
+```
+
+**Rendimiento esperado:**
+- 15-30 usuarios concurrentes
+- ~50-80 tokens/segundo
+
+---
+
+## 📊 Tabla de Compatibilidad
+
+| Escenario | Modelo | OLLAMA_NUM_PARALLEL | Users Concurrentes | VRAM Requerida |
+|-----------|--------|---------------------|-------------------|----------------|
+| **CPU** | qwen2.5-coder:3b | (default) | 1-2 | 2GB RAM |
+| **CPU** | qwen2.5-coder:7b | (default) | 1-2 | 5GB RAM |
+| **1 GPU 4090** | qwen2.5-coder:14b | 4 | 4-7 | 9GB |
+| **1 GPU 4090** | qwen2.5-coder:32b | 2 | 2-4 | 20GB |
+| **2 GPUs 4090** | qwen2.5-coder:14b | 8 | 8-12 | 18GB |
+| **2 GPUs 4090** | qwen2.5-coder:32b | 4 | 4-8 | 40GB |
+| **3 GPUs 4090** | qwen2.5-coder:32b | 12 | 15-30 | 60GB |
+
+> **Nota:** Los números son aproximados y dependen del contexto usado. Contextos más largos consumen más VRAM.
+
+---
+
+## 🔄 Alta Disponibilidad y Load Balancing
+
+### Múltiples Instancias de Ollama
+
+Cuando tengas 2-3 GPUs, puedes correr múltiples instancias de Ollama para mejor distribución de carga:
+
+#### Opción 1: Una instancia con múltiples GPUs
+
+```bash
+# Una sola instancia usando todas las GPUs
+CUDA_VISIBLE_DEVICES=0,1,2
+OLLAMA_NUM_PARALLEL=12
+ollama serve
+```
+
+**Ventajas:**
+- Más simple de configurar
+- Ollama maneja la distribución interna
+
+**Desventajas:**
+- Si la instancia cae, todo se cae
+
+#### Opción 2: Múltiples instancias + Nginx
+
+```bash
+# Instancia 1 - GPU 0
+CUDA_VISIBLE_DEVICES=0 ollama serve --port 11434
+
+# Instancia 2 - GPU 1
+CUDA_VISIBLE_DEVICES=1 ollama serve --port 11435
+
+# Instancia 3 - GPU 2
+CUDA_VISIBLE_DEVICES=2 ollama serve --port 11436
+```
+
+**nginx.conf:**
+```nginx
+upstream ollama_backends {
+    least_conn;
+    server localhost:11434 max_fails=3 fail_timeout=30s;
+    server localhost:11435 max_fails=3 fail_timeout=30s;
+    server localhost:11436 max_fails=3 fail_timeout=30s;
+}
+
+server {
+    listen 11434;
+    
+    location / {
+        proxy_pass http://ollama_backends;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+**Ventajas:**
+- Aislamiento completo
+- Si una GPU falla, las otras siguen
+- Mejor distribución de carga
+
+**Desventajas:**
+- Más complejo de configurar
+- Necesitas gestionar múltiples procesos
+
+#### Opción 3: LiteLLM Proxy
+
+[liteLLM](https://docs.litellm.ai/docs/proxy/quick_start) puede manejar múltiples backends:
+
+```yaml
+# config.yml
+model_list:
+  - model_name: qwen2.5-coder
+    litellm_params:
+      model: ollama/qwen2.5-coder:32b
+      api_base: http://localhost:11434
+  - model_name: qwen2.5-coder
+    litellm_params:
+      model: ollama/qwen2.5-coder:32b
+      api_base: http://localhost:11435
+```
+
+**Ventajas:**
+- Rate limiting integrado
+- Retries automáticos
+- Métricas y monitoreo
+- Soporta múltiples proveedores
 
 ---
 
@@ -161,6 +377,11 @@ OLLAMA_URL=http://localhost:11434
 
 # Rate limiting - requests por minuto (default: 10)
 RATE_LIMIT_PER_MINUTE=10
+
+# CORS - Orígenes permitidos (separados por coma)
+# Para desarrollo local, los localhost están permitidos por defecto
+# En producción, agregar tu dominio: ALLOWED_ORIGINS=https://tu-dominio.com
+# Para permitir todos: ALLOWED_ORIGINS=*
 ```
 
 ### 5. Descargar modelo en Ollama
@@ -453,6 +674,240 @@ TOTAL                     ✅ 31 passed
 
 ---
 
+## 🐳 Docker con GPU
+
+### Docker Compose con soporte GPU
+
+Para producción con GPUs, usa Docker Compose con soporte NVIDIA:
+
+```yaml
+# docker-compose.gpu.yml
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_MAX_LOADED_MODELS=2
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data.db:/app/data.db
+      - ./api:/app/api
+      - ./core:/app/core
+    environment:
+      - PORT=8000
+      - MODEL_NAME=qwen2.5-coder:14b
+      - MODEL_TYPE=ollama
+      - OLLAMA_URL=http://ollama:11434
+    env_file:
+      - .env
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  ollama_data:
+```
+
+### Múltiples GPUs con Docker
+
+```yaml
+# docker-compose.3gpu.yml
+version: '3.8'
+
+services:
+  ollama1:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+
+  ollama2:
+    image: ollama/ollama:latest
+    ports:
+      - "11435:11434"
+    environment:
+      - CUDA_VISIBLE_DEVICES=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['1']
+              capabilities: [gpu]
+
+  ollama3:
+    image: ollama/ollama:latest
+    ports:
+      - "11436:11434"
+    environment:
+      - CUDA_VISIBLE_DEVICES=2
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['2']
+              capabilities: [gpu]
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - ollama1
+      - ollama2
+      - ollama3
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_URL=http://nginx:11434
+    depends_on:
+      - nginx
+
+volumes:
+  ollama_data:
+```
+
+### Requisitos para Docker con GPU
+
+1. **NVIDIA Docker Toolkit** instalado
+2. **Docker Desktop** con soporte WSL2 (Windows) o Docker Engine (Linux)
+3. **Drivers NVIDIA** actualizados
+
+```bash
+# Verificar que Docker ve las GPUs
+docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
+```
+
+---
+
+## 🔄 Actualización de Modelos
+
+### Actualización Manual
+
+```bash
+# Ver modelos instalados
+ollama list
+
+# Actualizar un modelo
+ollama pull qwen2.5-coder:14b
+
+# Actualizar todos los modelos
+ollama pull --all
+```
+
+### Actualización Automática con Scripts
+
+RETBOT incluye scripts para automatizar la actualización:
+
+**Linux/Mac/WSL:**
+```bash
+# Ejecutar script bash
+./scripts/update_models.sh
+```
+
+**Windows PowerShell:**
+```powershell
+# Ejecutar script PowerShell
+.\scripts\update_models.ps1
+```
+
+**Python (Cross-platform):**
+```bash
+# Ejecutar script Python
+python scripts/update_models.py
+```
+
+**Qué hace el script:**
+- ✅ Verifica que Ollama esté instalado y corriendo
+- ✅ Verifica espacio en disco disponible
+- ✅ Crea backup automático antes de actualizar
+- ✅ Actualiza todos los modelos configurados
+- ✅ Guarda log de actualizaciones en `logs/ollama_updates.log`
+- ✅ Muestra resumen al finalizar
+
+### Programar Actualizaciones Automáticas
+
+**Linux/Mac - Cron Job (semanal):**
+```bash
+# Editar crontab
+crontab -e
+
+# Agregar línea para actualizar cada domingo a las 3 AM
+0 3 * * 0 cd /ruta/ai && ./scripts/update_models.sh >> logs/ollama_updates.log 2>&1
+```
+
+**Windows - Task Scheduler:**
+```powershell
+# Crear tarea programada (PowerShell Admin)
+$action = New-ScheduledTaskAction -Execute "PowerShell.exe" `
+  -Argument "-ExecutionPolicy Bypass -File `".\scripts\update_models.ps1`""
+
+$trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 3am
+
+Register-ScheduledTask -TaskName "RETBOT Update Models" `
+  -Action $action -Trigger $trigger -Description "Actualizar modelos de Ollama semanalmente"
+```
+
+### Consideraciones Importantes
+
+**1. Frecuencia recomendada:**
+- Cada 2-4 semanas (no más seguido)
+- En horarios de baja demanda (madrugada/fin de semana)
+
+**2. Espacio en disco:**
+- Cada modelo ocupa 2-20GB según tamaño
+- Las actualizaciones pueden requerir espacio temporal adicional
+- Scripts hacen backup automático (ocupa espacio extra)
+
+**3. Downtime:**
+- Actualizar un modelo de 20GB: 5-30 minutos según internet
+- Durante la actualización, el modelo anterior sigue disponible
+- No hay downtime del servidor
+
+**4. Backup:**
+- Scripts crean backup automático en `backups/`
+- Se guarda lista de modelos antes de actualizar
+- Útil para rollback si hay problemas
+
+---
+
 ## 🐛 Troubleshooting
 
 ### "Ollama not connected"
@@ -540,6 +995,10 @@ ai/
 │       ├── __init__.py
 │       ├── definitions.py # Schemas de tools
 │       └── executor.py    # ToolExecutor seguro
+├── scripts/                # 🆕 Scripts de mantenimiento
+│   ├── update_models.sh   # Actualización (Linux/Mac/WSL)
+│   ├── update_models.ps1  # Actualización (Windows)
+│   └── update_models.py   # Actualización (Cross-platform)
 ├── tests/                  # Tests con pytest
 │   ├── __init__.py
 │   ├── conftest.py        # Fixtures
@@ -547,11 +1006,19 @@ ai/
 │   ├── test_api_keys.py   # Tests de API keys
 │   ├── test_tools.py      # Tests de tools
 │   └── test_integration.py # Tests E2E
+├── backups/                # 🆕 Backups automáticos (gitignore)
+├── logs/                   # 🆕 Logs del sistema (gitignore)
 ├── server.py              # Entry point FastAPI
 ├── requirements.txt       # Dependencias
-├── .env                   # Variables de entorno (crear)
-├── opencode.json.example  # Ejemplo de config OpenCode
-└── Readme.md              # Este archivo
+├── .env                   # Variables de entorno (gitignore)
+├── .env.example           # Ejemplo de .env
+├── docker-compose.yml     # Docker para desarrollo
+├── docker-compose.gpu.yml # 🆕 Docker para producción con GPU
+├── nginx.conf.example     # 🆕 Load balancing config
+├── Readme.md              # Este archivo
+├── GPU_SETUP_GUIDE.md     # 🆕 Guía de configuración de GPUs
+├── CONFIGURACION_RAPIDA.md # 🆕 Referencia rápida
+└── MAINTENANCE.md         # 🆕 Guía de mantenimiento
 ```
 
 ---
@@ -583,6 +1050,10 @@ __pycache__/
 
 ## 🚀 Roadmap / Futuras mejoras
 
+- [x] **Soporte multi-GPU** - Configuración para 1-3 GPUs RTX 4090
+- [x] **Docker Compose con GPU** - docker-compose.gpu.yml listo para producción
+- [x] **Load Balancing** - Nginx config para múltiples instancias de Ollama
+- [x] **Documentación GPU** - Guía detallada de configuración
 - [ ] **Streaming con Tools** - Implementar SSE interrumpido por tool execution
 - [ ] **Más Tools** - Git operations, búsqueda de código, análisis estático
 - [ ] **Web UI** - Interfaz web para administración
@@ -590,7 +1061,7 @@ __pycache__/
 - [ ] **Conversations** - Persistencia de threads/conversaciones
 - [ ] **Plugins** - Sistema de plugins para tools custom
 - [ ] **Metrics** - Prometheus/Grafana para monitoreo
-- [ ] **Docker Compose** - Setup completo con Ollama incluido
+- [ ] **Redis Cache** - Cache de respuestas para reducir llamadas al LLM
 
 ---
 
@@ -616,6 +1087,16 @@ __pycache__/
 ## 📄 Licencia
 
 Este proyecto está licenciado bajo MIT License - ver el archivo [LICENSE](LICENSE) para detalles.
+
+---
+
+## 📚 Documentación Adicional
+
+- **[🔧 Mantenimiento](MAINTENANCE.md)** - Guía completa de mantenimiento, actualizaciones y operaciones
+- **[🎮 Guía de Configuración de GPUs](GPU_SETUP_GUIDE.md)** - Instrucciones detalladas para configurar con 1-3 GPUs RTX 4090
+- **[⚡ Configuración Rápida](CONFIGURACION_RAPIDA.md)** - Referencia rápida de configuraciones
+- **[🐳 Docker con GPU](#-docker-con-gpu)** - Configuración Docker para producción
+- **[🔄 Load Balancing](#-alta-disponibilidad-y-load-balancing)** - Múltiples instancias de Ollama
 
 ```
 MIT License

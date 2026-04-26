@@ -3,7 +3,7 @@
 import argparse
 import asyncio
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from core.database import init_db, User, AuditLog, APIKey, async_session
 from core.auth import hash_password, verify_password, create_access_token
@@ -25,8 +25,8 @@ async def create_admin(args):
             existing.password_hash = hash_password(args.password)
             existing.is_admin = True
             existing.is_active = True
-            existing.password_changed_at = datetime.utcnow()
-            existing.password_expires_at = datetime.utcnow() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
+            existing.password_changed_at = datetime.now(timezone.utc)
+            existing.password_expires_at = datetime.now(timezone.utc) + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
             await session.commit()
             print(f"✅ Admin '{args.username}' actualizado")
         else:
@@ -36,8 +36,8 @@ async def create_admin(args):
                 password_hash=hash_password(args.password),
                 is_admin=True,
                 is_active=True,
-                password_changed_at=datetime.utcnow(),
-                password_expires_at=datetime.utcnow() + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
+                password_changed_at=datetime.now(timezone.utc),
+                password_expires_at=datetime.now(timezone.utc) + timedelta(days=settings.PASSWORD_EXPIRE_DAYS)
             )
             session.add(admin)
             await session.commit()
