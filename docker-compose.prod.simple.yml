@@ -1,0 +1,115 @@
+# ============================================
+# RETBOT - Producción Simple (Sin build)
+# ============================================
+# Usa imagen pre-construida o build local
+# ============================================
+
+version: '3.8'
+
+services:
+  # ============================================
+  # API - Servidor FastAPI
+  # ============================================
+  api:
+    image: python:3.11-slim
+    container_name: retbot-api
+    working_dir: /app
+    ports:
+      - "8000:8000"
+    volumes:
+      # Montar código fuente
+      - .:/app
+      # Datos persistentes
+      - ./data:/app/data
+      # Logs
+      - ./logs:/app/logs
+    environment:
+      # Servidor
+      - PORT=8000
+      
+      # Modelo (CPU-only)
+      - MODEL_NAME=qwen2.5-coder:3b
+      - MODEL_TYPE=ollama
+      - OLLAMA_URL=http://host.docker.internal:11434
+      
+      # Redis (cache)
+      - REDIS_URL=redis://redis:6379
+      
+      # Concurrencia (CPU)
+      - OLLAMA_CONTEXT_LENGTH=4096
+      
+      # Rate limiting
+      - RATE_LIMIT_PER_USER=20
+      - RATE_LIMIT_PER_MINUTE=10
+      - RATE_LIMIT_ENABLED=true
+      
+      # Logging
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      
+      # CORS
+      - ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
+      
+      # Seguridad (del archivo .env)
+      - ADMIN_PASSWORD
+      - SECRET_KEY
+      - API_KEY
+    env_file:
+      - .env
+    extra_hosts:
+      # Para conectar con Ollama en el host
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "pip install --no-cache-dir -r requirements.txt &&
+             python server.py"
+    restart: unless-stopped
+    networks:
+      - retbot-network
+
+  # ============================================
+  # Redis - Cache de respuestas
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: retbot-redis
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - retbot-network
+
+networks:
+  retbot-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+
+# ============================================
+# INSTRUCCIONES
+# ============================================
+#
+# 1. Primera vez:
+#    cp .env.example .env
+#    vi .env  # Configurar ADMIN_PASSWORD
+#    docker-compose -f docker-compose.prod.simple.yml up -d
+#
+# 2. Ver logs:
+#    docker-compose -f docker-compose.prod.simple.yml logs -f api
+#
+# 3. Health check:
+#    curl http://localhost:8000/health
+#
+# 4. Web UI:
+#    http://TU_IP:8000/admin/ui
+#
+# ============================================
