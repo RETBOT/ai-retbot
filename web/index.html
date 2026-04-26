@@ -58,11 +58,10 @@
             gap: 1rem;
         }
 
-        .api-key-display {
+        .user-display {
             background: rgba(255,255,255,0.2);
             padding: 0.5rem 1rem;
             border-radius: 0.5rem;
-            font-family: monospace;
             font-size: 0.9rem;
         }
 
@@ -348,29 +347,67 @@
         .copy-btn:hover {
             background: rgba(255,255,255,0.2);
         }
+
+        /* Login Modal */
+        .login-modal {
+            display: flex;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .login-box {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .login-title {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+            text-align: center;
+        }
     </style>
 </head>
 <body>
     <!-- Login Modal -->
-    <div id="login-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center;">
-        <div style="background: white; padding: 2rem; border-radius: 1rem; max-width: 400px; width: 90%;">
-            <h2 style="margin-bottom: 1.5rem; color: var(--primary);">🦜 RETBOT Login</h2>
+    <div id="login-modal" class="login-modal">
+        <div class="login-box">
+            <h2 class="login-title">🦜 RETBOT Login</h2>
             
             <div class="form-group">
-                <label class="form-label">API Key</label>
-                <input type="text" id="login-api-key" class="form-input" placeholder="Ingresa tu API Key">
-                <small style="color: var(--text-light); margin-top: 0.5rem; display: block;">
-                    La API Key se genera automáticamente al iniciar.<br>
-                    Búscala en los logs del servidor o crea una nueva desde Admin.
-                </small>
+                <label class="form-label">Usuario</label>
+                <input type="text" id="login-username" class="form-input" placeholder="admin" value="admin">
             </div>
             
-            <button class="btn btn-primary" onclick="doLogin()" style="width: 100%; margin-top: 1rem;">
+            <div class="form-group">
+                <label class="form-label">Contraseña</label>
+                <input type="password" id="login-password" class="form-input" placeholder="Contraseña">
+            </div>
+            
+            <button class="btn btn-primary" onclick="doLogin()" style="width: 100%;">
                 🔐 Iniciar Sesión
             </button>
             
             <div id="login-error" class="alert alert-error" style="display: none; margin-top: 1rem;">
-                API Key inválida. Verifica e intenta de nuevo.
+                Credenciales inválidas. Verifica e intenta de nuevo.
+            </div>
+            
+            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                <small style="color: var(--text-light);">
+                    <strong>Credenciales por defecto:</strong><br>
+                    Usuario: <code>admin</code><br>
+                    Contraseña: <code>***REDACTED***</code>
+                </small>
             </div>
         </div>
     </div>
@@ -379,14 +416,14 @@
     <div class="header">
         <div class="header-content">
             <div class="logo">🦜 RETBOT Admin</div>
-        <div class="user-info">
-            <div class="api-key-display">
-                API Key: <span id="current-api-key">demo_key_123</span>
+            <div class="user-info">
+                <div class="user-display">
+                    👤 <span id="current-username">admin</span>
+                </div>
+                <button class="btn btn-danger btn-sm" onclick="doLogout()">
+                    🚪 Salir
+                </button>
             </div>
-            <button class="btn btn-danger btn-sm" onclick="doLogout()" style="margin-left: 0.5rem;">
-                🚪 Salir
-            </button>
-        </div>
         </div>
     </div>
 
@@ -571,52 +608,71 @@
     <script>
         // Configuración - Detectar URL automáticamente
         const API_BASE = window.location.protocol + '//' + window.location.host;
-        let API_KEY = localStorage.getItem('retbot_api_key') || '';
-        
+        let ACCESS_TOKEN = localStorage.getItem('retbot_access_token') || '';
+        let CURRENT_USER = localStorage.getItem('retbot_username') || '';
+
         console.log('API Base URL:', API_BASE);
-        
-        // Headers para requests
+
+        // Headers para requests (usa JWT token)
         function getHeaders() {
             return {
-                'X-API-Key': API_KEY,
+                'Authorization': `Bearer ${ACCESS_TOKEN}`,
                 'Content-Type': 'application/json'
             };
         }
 
-        // Login
+        // Login con username/password
         async function doLogin() {
-            const apiKey = document.getElementById('login-api-key').value;
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
             const errorDiv = document.getElementById('login-error');
             
             try {
-                const response = await fetch(`${API_BASE}/auth/me`, {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
                     headers: {
-                        'X-API-Key': apiKey,
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
                 });
                 
-                if (response.status === 200) {
+                const data = await response.json();
+                
+                if (response.status === 200 && data.access_token) {
                     // Login exitoso
-                    API_KEY = apiKey;
-                    localStorage.setItem('retbot_api_key', apiKey);
-                    document.getElementById('current-api-key').textContent = apiKey;
+                    ACCESS_TOKEN = data.access_token;
+                    CURRENT_USER = username;
+                    
+                    // Guardar en localStorage
+                    localStorage.setItem('retbot_access_token', ACCESS_TOKEN);
+                    localStorage.setItem('retbot_username', CURRENT_USER);
+                    
+                    // Actualizar UI
+                    document.getElementById('current-username').textContent = CURRENT_USER;
                     document.getElementById('login-modal').style.display = 'none';
+                    
+                    // Cargar dashboard
                     loadDashboard();
                     loadCache();
                 } else {
                     // Login fallido
                     errorDiv.style.display = 'block';
+                    errorDiv.textContent = data.detail || 'Credenciales inválidas';
                 }
             } catch (error) {
                 console.error('Login error:', error);
                 errorDiv.style.display = 'block';
+                errorDiv.textContent = 'Error de conexión: ' + error.message;
             }
         }
 
         // Logout
         function doLogout() {
-            localStorage.removeItem('retbot_api_key');
+            localStorage.removeItem('retbot_access_token');
+            localStorage.removeItem('retbot_username');
             location.reload();
         }
 
@@ -883,13 +939,12 @@
 
         // Inicializar
         document.addEventListener('DOMContentLoaded', () => {
-            // Mostrar login modal siempre
-            document.getElementById('login-modal').style.display = 'flex';
-            
-            // Si hay API key guardada, cargarla
-            if (API_KEY) {
-                document.getElementById('login-api-key').value = API_KEY;
-                document.getElementById('current-api-key').textContent = API_KEY;
+            // Verificar si ya hay token guardado
+            if (ACCESS_TOKEN) {
+                document.getElementById('current-username').textContent = CURRENT_USER;
+                document.getElementById('login-modal').style.display = 'none';
+                loadDashboard();
+                loadCache();
             }
         });
     </script>
