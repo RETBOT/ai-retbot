@@ -109,6 +109,21 @@ app.include_router(admin_router)
 app.include_router(jobs_router)
 app.include_router(streaming_router)
 
+# Servir Web UI estática
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
+
+# Montar directorio web
+web_dir = os.path.join(os.path.dirname(__file__), 'web')
+if os.path.exists(web_dir):
+    app.mount("/static", StaticFiles(directory=web_dir), name="static")
+    
+    @app.get("/admin/ui")
+    async def serve_ui():
+        """Servir Web UI de administración"""
+        return FileResponse(os.path.join(web_dir, 'index.html'))
+
 
 @app.get("/health")
 async def health_simple():

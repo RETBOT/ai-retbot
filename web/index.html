@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RETBOT - Admin Dashboard</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        /* Header */
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .api-key-display {
+            background: rgba(255,255,255,0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        /* Navigation */
+        .nav {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 0.5rem 2rem;
+        }
+
+        .nav-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-btn {
+            background: none;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            color: var(--text-light);
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover {
+            background: var(--bg);
+            color: var(--primary);
+        }
+
+        .nav-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Main Content */
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--text);
+        }
+
+        /* Cards */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 0.875rem;
+            color: var(--text-light);
+            margin-bottom: 0.5rem;
+        }
+
+        .card-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .card-value.success { color: var(--secondary); }
+        .card-value.warning { color: var(--warning); }
+        .card-value.danger { color: var(--danger); }
+
+        /* Tables */
+        .table-container {
+            background: var(--card);
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg);
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+
+        tr:hover {
+            background: var(--bg);
+        }
+
+        /* Status Badges */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-info { background: #dbeafe; color: #1e40af; }
+
+        /* Buttons */
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-light);
+        }
+
+        .spinner {
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            width: 2rem;
+            height: 2rem;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .alert-success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        /* Health Status */
+        .health-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .health-item {
+            padding: 1rem;
+            background: var(--bg);
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+
+        .health-status {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .health-status.ok { color: var(--secondary); }
+        .health-status.error { color: var(--danger); }
+
+        /* Code blocks */
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            overflow-x: auto;
+            margin: 0.5rem 0;
+        }
+
+        .copy-btn {
+            float: right;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">🦜 RETBOT Admin</div>
+            <div class="user-info">
+                <div class="api-key-display">
+                    API Key: <span id="current-api-key">demo_key_123</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav">
+        <div class="nav-content">
+            <button class="nav-btn active" onclick="showSection('dashboard')">📊 Dashboard</button>
+            <button class="nav-btn" onclick="showSection('health')">🏥 Health</button>
+            <button class="nav-btn" onclick="showSection('users')">👥 Usuarios</button>
+            <button class="nav-btn" onclick="showSection('jobs')">💼 Jobs</button>
+            <button class="nav-btn" onclick="showSection('apikeys')">🔑 API Keys</button>
+            <button class="nav-btn" onclick="showSection('cache')">💾 Cache</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main">
+        <!-- Dashboard Section -->
+        <div id="dashboard" class="section active">
+            <h1 class="section-title">📊 Dashboard</h1>
+            
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-title">Estado del Sistema</div>
+                    <div class="card-value" id="system-status">-</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Usuarios Totales</div>
+                    <div class="card-value" id="total-users">-</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Jobs Totales</div>
+                    <div class="card-value" id="total-jobs">-</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Cache Hit Rate</div>
+                    <div class="card-value" id="cache-hit-rate">-</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Modelo Actual</div>
+                <div style="font-size: 1.25rem; margin-top: 0.5rem;" id="current-model">-</div>
+                <div style="color: var(--text-light); margin-top: 0.25rem;" id="model-type">-</div>
+            </div>
+        </div>
+
+        <!-- Health Section -->
+        <div id="health" class="section">
+            <h1 class="section-title">🏥 Health Check</h1>
+            
+            <div class="card">
+                <button class="btn btn-primary" onclick="loadHealth()">🔄 Refresh</button>
+                <div id="health-content" class="health-grid" style="margin-top: 1rem;">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Cargando...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Section -->
+        <div id="users" class="section">
+            <h1 class="section-title">👥 Usuarios</h1>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Admin</th>
+                            <th>Activo</th>
+                            <th>Creado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-table">
+                        <tr>
+                            <td colspan="5" class="loading">
+                                <div class="spinner"></div>
+                                Cargando...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Jobs Section -->
+        <div id="jobs" class="section">
+            <h1 class="section-title">💼 Jobs</h1>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Usuario</th>
+                            <th>Mensaje</th>
+                            <th>Estado</th>
+                            <th>Modelo</th>
+                            <th>Creado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="jobs-table">
+                        <tr>
+                            <td colspan="6" class="loading">
+                                <div class="spinner"></div>
+                                Cargando...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- API Keys Section -->
+        <div id="apikeys" class="section">
+            <h1 class="section-title">🔑 API Keys</h1>
+            
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <h3 style="margin-bottom: 1rem;">Crear Nueva API Key</h3>
+                <div class="form-group">
+                    <label class="form-label">Nombre</label>
+                    <input type="text" id="api-key-name" class="form-input" placeholder="Ej: OpenCode Desktop">
+                </div>
+                <button class="btn btn-primary" onclick="createApiKey()">➕ Crear API Key</button>
+                
+                <div id="api-key-result" style="margin-top: 1rem; display: none;">
+                    <div class="alert alert-success">
+                        <strong>✅ API Key creada exitosamente</strong>
+                        <div class="code-block" style="margin-top: 0.5rem;">
+                            <button class="copy-btn" onclick="copyApiKey()">Copiar</button>
+                            <span id="new-api-key"></span>
+                        </div>
+                        <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+                            ⚠️ Guarda esta key, no se mostrará de nuevo
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-bottom: 1rem;">API Keys Existentes</h3>
+                <div id="api-keys-list" class="loading">
+                    <div class="spinner"></div>
+                    Cargando...
+                </div>
+            </div>
+        </div>
+
+        <!-- Cache Section -->
+        <div id="cache" class="section">
+            <h1 class="section-title">💾 Cache</h1>
+            
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-title">Cache Hits</div>
+                    <div class="card-value success" id="cache-hits">-</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Cache Misses</div>
+                    <div class="card-value warning" id="cache-misses">-</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Hit Rate</div>
+                    <div class="card-value" id="cache-hit-rate-detail">-</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Keys Set</div>
+                    <div class="card-value" id="cache-keys-set">-</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <button class="btn btn-danger" onclick="clearCache()">🗑️ Limpiar Cache</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración
+        const API_BASE = 'http://localhost:8000';
+        let API_KEY = localStorage.getItem('retbot_api_key') || 'demo_key_123';
+        
+        // Headers para requests
+        function getHeaders() {
+            return {
+                'X-API-Key': API_KEY,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        // Navegación
+        function showSection(sectionId) {
+            // Ocultar todas las secciones
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            
+            // Mostrar sección seleccionada
+            document.getElementById(sectionId).classList.add('active');
+            event.target.classList.add('active');
+            
+            // Cargar datos
+            loadSectionData(sectionId);
+        }
+
+        // Cargar datos de sección
+        function loadSectionData(sectionId) {
+            switch(sectionId) {
+                case 'dashboard':
+                    loadDashboard();
+                    break;
+                case 'health':
+                    loadHealth();
+                    break;
+                case 'users':
+                    loadUsers();
+                    break;
+                case 'jobs':
+                    loadJobs();
+                    break;
+                case 'apikeys':
+                    loadApiKeys();
+                    break;
+                case 'cache':
+                    loadCache();
+                    break;
+            }
+        }
+
+        // Dashboard
+        async function loadDashboard() {
+            try {
+                const healthRes = await fetch(`${API_BASE}/health`, { headers: getHeaders() });
+                const health = await healthRes.json();
+                
+                document.getElementById('system-status').textContent = health.status || 'unknown';
+                document.getElementById('current-model').textContent = health.model || '-';
+                
+                const usersRes = await fetch(`${API_BASE}/admin/users`, { headers: getHeaders() });
+                const users = await usersRes.json();
+                document.getElementById('total-users').textContent = users.length || 0;
+                
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        // Health
+        async function loadHealth() {
+            const container = document.getElementById('health-content');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Cargando...</div>';
+            
+            try {
+                const res = await fetch(`${API_BASE}/health/full`, { headers: getHeaders() });
+                const health = await res.json();
+                
+                const services = health.services || {};
+                
+                container.innerHTML = `
+                    <div class="health-item">
+                        <div class="health-status ${services.ollama?.status === 'connected' ? 'ok' : 'error'}">
+                            ${services.ollama?.status === 'connected' ? '✅' : '❌'}
+                        </div>
+                        <div>Ollama</div>
+                        <div style="font-size: 0.75rem; color: var(--text-light);">${services.ollama?.status || 'unknown'}</div>
+                    </div>
+                    <div class="health-item">
+                        <div class="health-status ${services.database?.status === 'connected' ? 'ok' : 'error'}">
+                            ${services.database?.status === 'connected' ? '✅' : '❌'}
+                        </div>
+                        <div>Database</div>
+                        <div style="font-size: 0.75rem; color: var(--text-light);">${services.database?.status || 'unknown'}</div>
+                    </div>
+                    <div class="health-item">
+                        <div class="health-status ${services.redis?.status === 'connected' ? 'ok' : services.redis?.status === 'not_configured' ? 'ok' : 'error'}">
+                            ${services.redis?.status === 'connected' ? '✅' : services.redis?.status === 'not_configured' ? '⚪' : '❌'}
+                        </div>
+                        <div>Redis</div>
+                        <div style="font-size: 0.75rem; color: var(--text-light);">${services.redis?.status || 'unknown'}</div>
+                    </div>
+                    <div class="health-item">
+                        <div class="health-status ${services.gpu?.available ? 'ok' : ''}">
+                            ${services.gpu?.available ? '✅' : '⚪'}
+                        </div>
+                        <div>GPU</div>
+                        <div style="font-size: 0.75rem; color: var(--text-light);">${services.gpu?.available ? 'Disponible' : 'No disponible'}</div>
+                    </div>
+                    <div class="health-item">
+                        <div style="font-size: 1.5rem;">⏱️</div>
+                        <div>Uptime</div>
+                        <div style="font-size: 0.75rem; color: var(--text-light);">${health.uptime?.formatted || '-'}</div>
+                    </div>
+                `;
+                
+            } catch (error) {
+                container.innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Users
+        async function loadUsers() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/users`, { headers: getHeaders() });
+                const users = await res.json();
+                
+                const tbody = document.getElementById('users-table');
+                tbody.innerHTML = users.map(user => `
+                    <tr>
+                        <td>${user.id.slice(0, 8)}...</td>
+                        <td>${user.username}</td>
+                        <td><span class="badge ${user.is_admin ? 'badge-success' : 'badge-info'}">${user.is_admin ? 'Admin' : 'User'}</span></td>
+                        <td><span class="badge ${user.is_active ? 'badge-success' : 'badge-danger'}">${user.is_active ? 'Activo' : 'Inactivo'}</span></td>
+                        <td>${new Date(user.created_at).toLocaleString()}</td>
+                    </tr>
+                `).join('');
+                
+            } catch (error) {
+                document.getElementById('users-table').innerHTML = '<tr><td colspan="5" class="alert alert-error">Error: ' + error.message + '</td></tr>';
+            }
+        }
+
+        // Jobs
+        async function loadJobs() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/jobs`, { headers: getHeaders() });
+                const jobs = await res.json();
+                
+                const tbody = document.getElementById('jobs-table');
+                tbody.innerHTML = jobs.slice(0, 50).map(job => `
+                    <tr>
+                        <td>${job.id.slice(0, 8)}...</td>
+                        <td>${job.user_id.slice(0, 8)}...</td>
+                        <td>${job.message?.slice(0, 50) || '-'}...</td>
+                        <td><span class="badge badge-${job.status === 'completed' ? 'success' : job.status === 'failed' ? 'danger' : 'warning'}">${job.status}</span></td>
+                        <td>${job.model || '-'}</td>
+                        <td>${new Date(job.created_at).toLocaleString()}</td>
+                    </tr>
+                `).join('');
+                
+            } catch (error) {
+                document.getElementById('jobs-table').innerHTML = '<tr><td colspan="6" class="alert alert-error">Error: ' + error.message + '</td></tr>';
+            }
+        }
+
+        // API Keys
+        async function loadApiKeys() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/api-keys`, { headers: getHeaders() });
+                const keys = await res.json();
+                
+                const container = document.getElementById('api-keys-list');
+                container.innerHTML = keys.map(key => `
+                    <div style="padding: 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>${key.name}</strong>
+                            <div style="font-size: 0.875rem; color: var(--text-light); font-family: monospace;">${key.key_hash?.slice(0, 20)}...</div>
+                        </div>
+                        <div>
+                            <span class="badge ${key.is_active ? 'badge-success' : 'badge-danger'}">${key.is_active ? 'Activa' : 'Inactiva'}</span>
+                            <button class="btn btn-danger btn-sm" style="margin-left: 0.5rem;" onclick="revokeApiKey('${key.id}')">Revocar</button>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                document.getElementById('api-keys-list').innerHTML = '<div class="alert alert-error">Error: ' + error.message + '</div>';
+            }
+        }
+
+        async function createApiKey() {
+            const name = document.getElementById('api-key-name').value;
+            
+            if (!name) {
+                alert('Por favor ingresa un nombre');
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_BASE}/admin/api-keys`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ name })
+                });
+                
+                const data = await res.json();
+                
+                document.getElementById('new-api-key').textContent = data.key;
+                document.getElementById('api-key-result').style.display = 'block';
+                document.getElementById('api-key-name').value = '';
+                
+                // Recargar lista
+                setTimeout(loadApiKeys, 1000);
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function revokeApiKey(keyId) {
+            if (!confirm('¿Seguro que quieres revocar esta API key?')) return;
+            
+            try {
+                await fetch(`${API_BASE}/admin/api-keys/${keyId}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
+                loadApiKeys();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function copyApiKey() {
+            const key = document.getElementById('new-api-key').textContent;
+            navigator.clipboard.writeText(key);
+            alert('API Key copiada al portapapeles');
+        }
+
+        // Cache
+        async function loadCache() {
+            try {
+                const res = await fetch(`${API_BASE}/agent/cache/stats`, { headers: getHeaders() });
+                const data = await res.json();
+                
+                const stats = data.cache?.stats || {};
+                
+                document.getElementById('cache-hits').textContent = stats.hits || 0;
+                document.getElementById('cache-misses').textContent = stats.misses || 0;
+                document.getElementById('cache-hit-rate-detail').textContent = (stats.hit_rate_percent || 0) + '%';
+                document.getElementById('cache-keys-set').textContent = stats.keys_set || 0;
+                document.getElementById('cache-hit-rate').textContent = (stats.hit_rate_percent || 0) + '%';
+                
+            } catch (error) {
+                console.error('Error loading cache:', error);
+            }
+        }
+
+        async function clearCache() {
+            if (!confirm('¿Seguro que quieres limpiar todo el cache?')) return;
+            
+            try {
+                await fetch(`${API_BASE}/agent/cache/clear`, {
+                    method: 'POST',
+                    headers: getHeaders()
+                });
+                alert('Cache limpiado exitosamente');
+                loadCache();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDashboard();
+            loadCache();
+        });
+    </script>
+</body>
+</html>
