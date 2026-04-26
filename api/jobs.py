@@ -15,6 +15,7 @@ from core.tools import TOOL_DEFINITIONS, ToolExecutor
 from core.rate_limit import limiter
 from core.cache import cache
 from core.model_manager import model_manager, get_model_for_request, init_model_manager
+from fastapi import Request
 
 router = APIRouter(prefix="/agent", tags=["jobs"])
 
@@ -77,7 +78,6 @@ async def get_user_from_credentials(
 
 
 @router.post("/chat/completions", response_model=OpenAIResponse)
-@limiter.limit(f"{settings.RATE_LIMIT_PER_USER}/minute")
 async def create_chat(
     data: ChatRequest,
     request: Request,

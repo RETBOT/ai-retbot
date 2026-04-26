@@ -15,6 +15,14 @@ logger = logging.getLogger(__name__)
 # Security scheme para obtener JWT
 security = HTTPBearer(auto_error=False)
 
+# Limiter global (se configura después con settings)
+_limiter: Optional[Limiter] = None
+
+
+def get_limiter() -> Optional[Limiter]:
+    """Obtener el limiter global"""
+    return _limiter
+
 
 def get_user_identifier(request: Request) -> str:
     """
@@ -63,12 +71,13 @@ def create_limiter() -> Limiter:
     Returns:
         Limiter: Instancia configurada de slowapi Limiter
     """
+    global _limiter
     from core.config import settings
     
     if not settings.RATE_LIMIT_ENABLED:
         logger.warning("⚠️ Rate limiting DESHABILITADO")
     
-    limiter = Limiter(
+    _limiter = Limiter(
         key_func=get_user_identifier,
         default_limits=[f"{settings.RATE_LIMIT_PER_USER}/minute"],
         enabled=settings.RATE_LIMIT_ENABLED,
@@ -76,7 +85,7 @@ def create_limiter() -> Limiter:
         # Para producción con múltiples instancias: f"redis://{settings.REDIS_URL}"
     )
     
-    return limiter
+    return _limiter
 
 
 def parse_rate_limit(limit_string: str) -> dict:

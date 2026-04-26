@@ -15,7 +15,6 @@ from pydantic import BaseModel
 from core.config import settings
 from core.database import get_session, User, get_or_create_default_user
 from core.auth import get_current_user_or_api_key
-from core.rate_limit import limiter
 
 router = APIRouter(prefix="/v1")
 
@@ -90,7 +89,6 @@ async def get_model(model_id: str):
 
 
 @router.post("/chat/completions")
-@limiter.limit(f"{settings.RATE_LIMIT_PER_USER}/minute")
 async def chat_completions_streaming(
     request: Request,
     db_user: User = Depends(get_current_user_or_api_key),
