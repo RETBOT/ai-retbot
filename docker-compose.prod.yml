@@ -13,7 +13,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     container_name: retbot-api
     ports:
       - "8000:8000"

@@ -1,0 +1,44 @@
+# Dockerfile para RETBOT API - Producción (Sin Ollama)
+# Ollama corre en el host, la API se conecta vía red
+
+FROM python:3.11-slim
+
+# Evitar interacciones durante la instalación
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Instalar dependencias mínimas
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copiar solo lo necesario
+COPY requirements.txt .
+COPY server.py .
+COPY api/ ./api/
+COPY core/ ./core/
+COPY cli/ ./cli/
+
+# Instalar dependencias de Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Crear directorios para datos y logs
+RUN mkdir -p /app/data /app/logs
+
+# Puerto
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Usuario no-root (seguridad)
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Comando
+CMD ["python", "server.py"]
