@@ -24,21 +24,40 @@ setup_logging(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Inicializar cache
-    from core.cache import init_cache, close_cache
-    await init_cache(settings.REDIS_URL)
-    
-    # Inicializar model manager
-    from core.model_manager import init_model_manager
-    await init_model_manager()
+    # Generar API Key si no existe
+    from core.database import async_session, APIKey
+    from sqlalchemy import select
     
     await init_db()
     logger.info("Base de datos inicializada")
     
-    from core.database import async_session
-    from sqlalchemy import select
-    
     async with async_session() as session:
+        # Verificar si hay API Keys
+        result = await session.execute(select(APIKey))
+        api_keys = result.scalars().all()
+        
+        if not api_keys:
+            # Generar API Key automática
+            import secrets
+            auto_api_key = f"rb_{secrets.token_hex(16)}"
+            
+            new_key = APIKey(
+                key_hash=auto_api_key,  # En producción debería hashearse
+                name="Auto-generated API Key",
+                is_active=True
+            )
+            session.add(new_key)
+            await session.commit()
+            
+            # Mostrar API Key en logs (solo la primera vez)
+            logger.info("=" * 60)
+            logger.info(f"🔑 API KEY GENERADA: {auto_api_key}")
+            logger.info("=" * 60)
+            logger.info("⚠️  GUARDA ESTA KEY - No se mostrará de nuevo")
+            logger.info("⚠️  Úsala en: X-API-Key header o Web UI login")
+            logger.info("=" * 60)
+        
+        # Verificar usuario admin
         result = await session.execute(select(User).where(User.username == "admin"))
         admin = result.scalar_one_or_none()
         

@@ -358,9 +358,10 @@
             
             <div class="form-group">
                 <label class="form-label">API Key</label>
-                <input type="text" id="login-api-key" class="form-input" placeholder="Ingresa tu API Key" value="demo_key_123">
+                <input type="text" id="login-api-key" class="form-input" placeholder="Ingresa tu API Key">
                 <small style="color: var(--text-light); margin-top: 0.5rem; display: block;">
-                    Obtén tu API Key en: <code>POST /admin/api-keys</code>
+                    La API Key se genera automáticamente al iniciar.<br>
+                    Búscala en los logs del servidor o crea una nueva desde Admin.
                 </small>
             </div>
             
@@ -570,7 +571,7 @@
     <script>
         // Configuración - Detectar URL automáticamente
         const API_BASE = window.location.protocol + '//' + window.location.host;
-        let API_KEY = localStorage.getItem('retbot_api_key') || 'demo_key_123';
+        let API_KEY = localStorage.getItem('retbot_api_key') || '';
         
         console.log('API Base URL:', API_BASE);
         
@@ -882,11 +883,11 @@
 
         // Inicializar
         document.addEventListener('DOMContentLoaded', () => {
-            // Mostrar login modal
+            // Mostrar login modal siempre
             document.getElementById('login-modal').style.display = 'flex';
             
-            // Si hay API key guardada, intentar cargar dashboard
-            if (API_KEY && API_KEY !== 'demo_key_123') {
+            // Si hay API key guardada, cargarla
+            if (API_KEY) {
                 document.getElementById('login-api-key').value = API_KEY;
                 document.getElementById('current-api-key').textContent = API_KEY;
             }
