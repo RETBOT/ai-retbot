@@ -351,15 +351,41 @@
     </style>
 </head>
 <body>
+    <!-- Login Modal -->
+    <div id="login-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 2rem; border-radius: 1rem; max-width: 400px; width: 90%;">
+            <h2 style="margin-bottom: 1.5rem; color: var(--primary);">🦜 RETBOT Login</h2>
+            
+            <div class="form-group">
+                <label class="form-label">API Key</label>
+                <input type="text" id="login-api-key" class="form-input" placeholder="Ingresa tu API Key" value="demo_key_123">
+                <small style="color: var(--text-light); margin-top: 0.5rem; display: block;">
+                    Obtén tu API Key en: <code>POST /admin/api-keys</code>
+                </small>
+            </div>
+            
+            <button class="btn btn-primary" onclick="doLogin()" style="width: 100%; margin-top: 1rem;">
+                🔐 Iniciar Sesión
+            </button>
+            
+            <div id="login-error" class="alert alert-error" style="display: none; margin-top: 1rem;">
+                API Key inválida. Verifica e intenta de nuevo.
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
     <div class="header">
         <div class="header-content">
             <div class="logo">🦜 RETBOT Admin</div>
-            <div class="user-info">
-                <div class="api-key-display">
-                    API Key: <span id="current-api-key">demo_key_123</span>
-                </div>
+        <div class="user-info">
+            <div class="api-key-display">
+                API Key: <span id="current-api-key">demo_key_123</span>
             </div>
+            <button class="btn btn-danger btn-sm" onclick="doLogout()" style="margin-left: 0.5rem;">
+                🚪 Salir
+            </button>
+        </div>
         </div>
     </div>
 
@@ -542,9 +568,11 @@
     </div>
 
     <script>
-        // Configuración
-        const API_BASE = 'http://localhost:8000';
+        // Configuración - Detectar URL automáticamente
+        const API_BASE = window.location.protocol + '//' + window.location.host;
         let API_KEY = localStorage.getItem('retbot_api_key') || 'demo_key_123';
+        
+        console.log('API Base URL:', API_BASE);
         
         // Headers para requests
         function getHeaders() {
@@ -552,6 +580,43 @@
                 'X-API-Key': API_KEY,
                 'Content-Type': 'application/json'
             };
+        }
+
+        // Login
+        async function doLogin() {
+            const apiKey = document.getElementById('login-api-key').value;
+            const errorDiv = document.getElementById('login-error');
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/me`, {
+                    headers: {
+                        'X-API-Key': apiKey,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.status === 200) {
+                    // Login exitoso
+                    API_KEY = apiKey;
+                    localStorage.setItem('retbot_api_key', apiKey);
+                    document.getElementById('current-api-key').textContent = apiKey;
+                    document.getElementById('login-modal').style.display = 'none';
+                    loadDashboard();
+                    loadCache();
+                } else {
+                    // Login fallido
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        // Logout
+        function doLogout() {
+            localStorage.removeItem('retbot_api_key');
+            location.reload();
         }
 
         // Navegación
@@ -817,8 +882,14 @@
 
         // Inicializar
         document.addEventListener('DOMContentLoaded', () => {
-            loadDashboard();
-            loadCache();
+            // Mostrar login modal
+            document.getElementById('login-modal').style.display = 'flex';
+            
+            // Si hay API key guardada, intentar cargar dashboard
+            if (API_KEY && API_KEY !== 'demo_key_123') {
+                document.getElementById('login-api-key').value = API_KEY;
+                document.getElementById('current-api-key').textContent = API_KEY;
+            }
         });
     </script>
 </body>
