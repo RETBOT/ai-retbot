@@ -144,4 +144,5 @@ if os.path.exists(web_dir):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("server:app", host="0.0.0.0", port=settings.PORT, reload=True)
+    # Producción: sin reload
+    uvicorn.run("server:app", host="0.0.0.0", port=settings.PORT, reload=False)
