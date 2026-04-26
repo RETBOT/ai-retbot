@@ -23,6 +23,8 @@ services:
       - ./data:/app/data
       # Logs
       - ./logs:/app/logs
+      # Web UI
+      - ./web:/app/web
     environment:
       # Servidor
       - PORT=8000
