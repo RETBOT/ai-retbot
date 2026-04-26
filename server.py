@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI, Request
@@ -8,8 +9,17 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Configurar logging estructurado
+from core.logging_config import setup_logging, LoggingMiddleware, logger
+
+# Setup logging (JSON para producción, colored para desarrollo)
+log_format = "json" if os.getenv("LOG_FORMAT") == "json" else "auto"
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format_type=log_format,
+    service_name="retbot",
+    log_file="logs/server.log"
+)
 
 from core.config import settings
 from core.database import init_db, User
@@ -70,6 +80,9 @@ app = FastAPI(
 # Configurar rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Agregar middleware de logging
+app.add_middleware(LoggingMiddleware)
 
 # CORS: permitir todos si ALLOWED_ORIGINS=*, si no usar la lista configurada
 cors_origins = ["*"] if settings.ALLOWED_ORIGINS == "*" else settings.cors_origins
