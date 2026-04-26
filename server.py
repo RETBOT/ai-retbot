@@ -128,18 +128,30 @@ async def root():
 
 
 # Servir Web UI estática
-from fastapi.staticfiles import StaticFiles
-import os
-
-# Montar directorio web
-web_dir = os.path.join(os.path.dirname(__file__), 'web')
-if os.path.exists(web_dir):
-    app.mount("/static", StaticFiles(directory=web_dir), name="static")
+@app.get("/admin/ui")
+async def serve_ui():
+    """Servir Web UI de administración"""
+    from fastapi.responses import HTMLResponse
     
-    @app.get("/admin/ui")
-    async def serve_ui():
-        """Servir Web UI de administración"""
-        return FileResponse(os.path.join(web_dir, 'index.html'))
+    web_dir = os.path.join(os.path.dirname(__file__), 'web')
+    index_path = os.path.join(web_dir, 'index.html')
+    
+    try:
+        with open(index_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        return HTMLResponse(content=html_content, status_code=200)
+    except FileNotFoundError:
+        logger.error(f"No se encontró el archivo: {index_path}")
+        return HTMLResponse(
+            content="<h1>Error: Web UI no encontrada</h1><p>El archivo index.html no existe</p>",
+            status_code=404
+        )
+    except Exception as e:
+        logger.error(f"Error sirviendo Web UI: {e}")
+        return HTMLResponse(
+            content=f"<h1>Internal Server Error</h1><p>{str(e)}</p>",
+            status_code=500
+        )
 
 
 if __name__ == "__main__":
