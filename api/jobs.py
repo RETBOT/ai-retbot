@@ -85,7 +85,14 @@ async def create_chat(
     session: AsyncSession = Depends(get_session),
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    """Endpoint OpenAI-compatible para chat completions - soporta JWT, API Key y Tools"""
+    """Endpoint OpenAI-compatible para chat completions - soporta JWT, API Key y Tools - SOLO NO-STREAMING"""
+    
+    # Si stream=true, retornar error indicando que usen el endpoint de streaming
+    if data.stream:
+        raise HTTPException(
+            status_code=400,
+            detail="Streaming no soportado en este endpoint. Usa stream=false o el endpoint /api/v1/chat/completions con streaming habilitado."
+        )
     
     # Obtener usuario (API Key > JWT > Default)
     user = None
