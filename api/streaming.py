@@ -5,6 +5,7 @@ Usa httpx directo para streaming SSE como el ejemplo ai-ejemplo
 import uuid
 import json
 import httpx
+import logging
 from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Request, Header
@@ -15,6 +16,8 @@ from pydantic import BaseModel
 from core.config import settings
 from core.database import get_session, User, get_or_create_default_user
 from core.auth import get_current_user_or_api_key
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1")
 

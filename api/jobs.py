@@ -1,5 +1,6 @@
 import uuid
 import time as time_module
+import logging
 from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Request
@@ -14,6 +15,8 @@ from core.models import get_model_provider, SYSTEM_PROMPT
 from core.tools import TOOL_DEFINITIONS, ToolExecutor
 from core.cache import cache
 from core.model_manager import model_manager, get_model_for_request, init_model_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["jobs"])
 
