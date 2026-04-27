@@ -84,15 +84,8 @@ services:
     restart: unless-stopped
     networks:
       - retbot-network
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    # Si no tienes GPU, comenta la sección 'deploy' de arriba
-    # y Ollama usará CPU automáticamente
+    # Nota: GPU se configura automáticamente via script deploy.sh
+    # Si tienes GPU NVIDIA, ejecuta: ./deploy.sh --with-gpu
 
   # ============================================
   # Redis - Cache de respuestas
