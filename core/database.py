@@ -107,7 +107,9 @@ class APIKey(Base):
     def to_dict(self):
         return {
             "id": self.id,
+            "user_id": self.user_id,
             "name": self.name,
+            "key_hash": self.key_hash,
             "permissions": self.permissions,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
