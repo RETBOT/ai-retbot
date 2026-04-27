@@ -138,18 +138,14 @@ async def get_user_from_api_key(
 ) -> Optional[User]:
     """Validar API key y retornar usuario asociado"""
     from core.database import APIKey
-    import hashlib
     
     if not api_key:
         return None
     
-    # Calcular hash de la key
-    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-    
-    # Buscar key en la base de datos
+    # Buscar key en la base de datos (comparación directa, sin hash)
     result = await session.execute(
         select(APIKey).where(
-            APIKey.key_hash == key_hash,
+            APIKey.key_hash == api_key,
             APIKey.is_active == True
         )
     )

@@ -293,14 +293,13 @@ async def generate_opencode_config(
         import uuid
         
         random_part = secrets.token_urlsafe(32)
-        api_key_plain = f"rb_{random_part}"
-        key_hash = hashlib.sha256(api_key_plain.encode()).hexdigest()
+        api_key_plain = f"key_{random_part}"  # Prefix genérico
         
         api_key = APIKey(
             id=str(uuid.uuid4()),
             user_id=user.id,
             name="OpenCode Auto-Generated",
-            key_hash=key_hash,
+            key_hash=api_key_plain,  # Guardar sin hash
             permissions="chat",
             is_active=True
         )
@@ -326,7 +325,7 @@ async def generate_opencode_config(
                 "options": {
                     "baseURL": base_url,
                     "headers": {
-                        "X-API-Key": api_key_plain if api_key_plain.startswith("rb_") else "[API_KEY]"
+                        "X-API-Key": api_key_plain if api_key_plain.startswith("key_") else "[API_KEY]"
                     }
                 },
                 "models": {
@@ -380,14 +379,14 @@ async def create_api_key(
     session: AsyncSession = Depends(get_session)
 ):
     """Crear nueva API Key para el usuario actual"""
-    # Generar API Key única
-    api_key_plain = f"rb_{secrets.token_hex(16)}"
+    # Generar API Key única (prefix genérico)
+    api_key_plain = f"key_{secrets.token_hex(16)}"
     
-    # Crear API Key en DB
+    # Crear API Key en DB (guardar la key tal cual para poder revelarla después)
     api_key = APIKey(
         user_id=user.id,
         name=data.name,
-        key_hash=api_key_plain,  # En producción debería hashearse
+        key_hash=api_key_plain,  # Guardar la key sin hashear
         is_active=True
     )
     session.add(api_key)

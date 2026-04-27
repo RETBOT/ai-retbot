@@ -57,15 +57,15 @@ async def lifespan(app: FastAPI):
         if not api_keys:
             # Generar API Key automática
             import secrets
-            auto_api_key = f"rb_{secrets.token_hex(16)}"
+            auto_api_key = f"key_{secrets.token_hex(16)}"
             
             # Asociar al usuario admin si existe, si no dejar null
             admin_user_id = admin.id if admin else None
             
             new_key = APIKey(
-                key_hash=auto_api_key,
+                key_hash=auto_api_key,  # Guardar sin hash
                 name="Auto-generated API Key",
-                user_id=admin_user_id,  # Asociar al admin si existe
+                user_id=admin_user_id,
                 is_active=True
             )
             session.add(new_key)
