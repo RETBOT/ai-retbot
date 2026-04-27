@@ -15,7 +15,7 @@ from core.tools import TOOL_DEFINITIONS, ToolExecutor
 from core.cache import cache
 from core.model_manager import model_manager, get_model_for_request, init_model_manager
 
-router = APIRouter(prefix="/agent", tags=["jobs"])
+router = APIRouter(prefix="/api/v1", tags=["jobs"])
 
 security = HTTPBearer(auto_error=False)
 

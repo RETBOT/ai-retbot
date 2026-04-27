@@ -16,7 +16,7 @@ from core.config import settings
 from core.database import get_session, User, get_or_create_default_user
 from core.auth import get_current_user_or_api_key
 
-router = APIRouter(prefix="/v1")
+router = APIRouter(prefix="/api/v1")
 
 # Cliente global para streaming
 stream_client = httpx.AsyncClient(timeout=None)
