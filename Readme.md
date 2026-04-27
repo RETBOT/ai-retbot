@@ -8,6 +8,213 @@
 
 ---
 
+## 🚀 Instalación Rápida (Linux - Kamatera)
+
+### Requisitos Previos
+
+- Servidor Linux (Ubuntu 20.04+, CentOS 7+, Debian 10+)
+- 4GB RAM mínimo (8GB recomendado)
+- 2 CPUs mínimo (4+ recomendado)
+- 50GB disco libre
+- Acceso root o sudo
+- Puerto 8000 abierto en firewall
+
+### Paso 1: Instalar Docker y Docker Compose
+
+```bash
+# Actualizar sistema
+sudo yum update -y  # Para CentOS/RHEL
+# o
+sudo apt update && sudo apt upgrade -y  # Para Ubuntu/Debian
+
+# Instalar Docker
+curl -fsSL https://get.docker.com | sh
+
+# Iniciar y habilitar Docker
+sudo systemctl enable docker
+sudo systemctl start docker
+
+# Agregar usuario al grupo docker (opcional, para no usar sudo)
+sudo usermod -aG docker $USER
+
+# Instalar Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# Verificar instalación
+docker --version
+docker-compose --version
+```
+
+### Paso 2: Clonar el Repositorio
+
+```bash
+# Ir a directorio de instalación
+cd /opt
+
+# Clonar repositorio
+sudo git clone https://github.com/RETBOT/ai-retbot.git retbot-ai
+cd /opt/retbot-ai
+
+# Dar permisos
+sudo chown -R $USER:$USER /opt/retbot-ai
+```
+
+### Paso 3: Configurar Variables de Entorno
+
+```bash
+# Copiar archivo de ejemplo
+cp .env.example .env
+
+# Editar configuración
+vi .env
+# o
+nano .env
+```
+
+**Configuración mínima requerida:**
+
+```bash
+# Seguridad
+SECRET_KEY=tu_secret_key_muy_larga_y_segura_aqui_12345
+ADMIN_PASSWORD=tu_password_de_admin
+
+# Modelo (CPU-only)
+MODEL_NAME=qwen2.5-coder:3b
+MODEL_TYPE=ollama
+OLLAMA_URL=http://ollama:11434
+
+# Redis (cache)
+REDIS_URL=redis://redis:6379
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FORMAT=json
+
+# CORS (agregar tu IP pública)
+ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000,http://TU_IP_PUBLICA:8000
+```
+
+> **💡 Tip:** Para generar un SECRET_KEY seguro:
+> ```bash
+> openssl rand -hex 32
+> ```
+
+### Paso 4: Iniciar Servicios
+
+```bash
+# Iniciar todos los servicios (API, Ollama, Redis)
+docker-compose -f docker-compose.prod.simple.yml up -d
+
+# Ver estado de contenedores
+docker-compose -f docker-compose.prod.simple.yml ps
+
+# Ver logs en tiempo real
+docker-compose -f docker-compose.prod.simple.yml logs -f
+```
+
+### Paso 5: Descargar Modelo
+
+```bash
+# Esperar 30 segundos a que Ollama inicie
+sleep 30
+
+# Descargar modelo (puede tardar 5-10 minutos)
+docker exec retbot-ollama ollama pull qwen2.5-coder:3b
+
+# Ver modelos instalados
+docker exec retbot-ollama ollama list
+```
+
+### Paso 6: Verificar Instalación
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Health check completo
+curl http://localhost:8000/health/full
+```
+
+**Deberías ver algo como:**
+```json
+{"status":"healthy","timestamp":"2026-04-27T...","service":"retbot"}
+```
+
+---
+
+## 🔐 Primer Acceso
+
+### 1. Web UI de Administración
+
+Abre en tu navegador:
+```
+http://TU_IP_PUBLICA:8000/admin/ui
+```
+
+Ejemplo para Kamatera:
+```
+http://103.101.201.229:8000/admin/ui
+```
+
+**Credenciales por defecto:**
+- **Usuario:** `admin`
+- **Password:** El que configuraste en `ADMIN_PASSWORD`
+
+### 2. Generar API Key
+
+1. Inicia sesión en la Web UI
+2. Ve a la pestaña **"API Keys"**
+3. Click en **"Crear API Key"**
+4. Ponle un nombre (ej: `OpenCode`, `Prueba`)
+5. **Copia la API Key del modal** (solo se muestra una vez)
+6. Guárdala en un lugar seguro
+
+### 3. Probar API
+
+```bash
+# Con curl
+curl -X POST "http://TU_IP_PUBLICA:8000/api/v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: key_TU_API_KEY_AQUI" \
+  -d '{"messages": [{"role": "user", "content": "Hola"}], "stream": false, "model": "qwen2.5-coder:3b"}'
+```
+
+```powershell
+# Con PowerShell
+$Headers = @{
+    "Content-Type"="application/json"
+    "X-API-Key"="key_TU_API_KEY_AQUI"
+}
+$Body = '{"messages": [{"role": "user", "content": "Hola"}], "stream": false, "model": "qwen2.5-coder:3b"}'
+Invoke-WebRequest -Uri "http://TU_IP_PUBLICA:8000/api/v1/chat/completions" -Method POST -Headers $Headers -Body $Body
+```
+
+---
+
+## 🔧 Configuración para OpenCode
+
+### En OpenCode, configura:
+
+| Campo | Valor |
+|-------|-------|
+| **ID Proveedor** | `retbot` |
+| **Nombre a mostrar** | `RETBOT AI` |
+| **URL Base** | `http://TU_IP_PUBLICA:8000/api/v1` |
+| **Clave API** | `key_TU_API_KEY_AQUI` |
+| **ID Modelo** | `qwen2.5-coder:3b` |
+| **Nombre del modelo** | `Qwen2.5 Coder 3B` |
+
+### O usa el endpoint de configuración automática:
+
+```bash
+curl http://TU_IP_PUBLICA:8000/admin/opencode-config
+```
+
+Esto te devuelve un JSON que puedes copiar a tu configuración de OpenCode.
+
+---
+
 ## 🎯 ¿Qué es RETBOT?
 
 RETBOT es tu asistente de programación local, diseñado específicamente para integrarse con [OpenCode](https://opencode.ai):
@@ -1087,6 +1294,279 @@ __pycache__/
 ## 📄 Licencia
 
 Este proyecto está licenciado bajo MIT License - ver el archivo [LICENSE](LICENSE) para detalles.
+
+---
+
+## 🛠️ Comandos Útiles
+
+### Ver Estado de Servicios
+
+```bash
+# Ver contenedores corriendo
+docker-compose -f docker-compose.prod.simple.yml ps
+
+# Ver logs en tiempo real
+docker-compose -f docker-compose.prod.simple.yml logs -f
+
+# Ver logs solo de API
+docker-compose -f docker-compose.prod.simple.yml logs -f api
+
+# Ver logs solo de Ollama
+docker-compose -f docker-compose.prod.simple.yml logs -f ollama
+
+# Ver logs solo de Redis
+docker-compose -f docker-compose.prod.simple.yml logs -f redis
+```
+
+### Reiniciar Servicios
+
+```bash
+# Reiniciar todos los servicios
+docker-compose -f docker-compose.prod.simple.yml restart
+
+# Reiniciar solo API
+docker-compose -f docker-compose.prod.simple.yml restart api
+
+# Reiniciar solo Ollama
+docker-compose -f docker-compose.prod.simple.yml restart ollama
+```
+
+### Actualizar RETBOT
+
+```bash
+# Ir al directorio del proyecto
+cd /opt/retbot-ai
+
+# Bajar últimos cambios
+git pull origin main
+
+# Reiniciar servicios con nuevos cambios
+docker-compose -f docker-compose.prod.simple.yml down
+docker-compose -f docker-compose.prod.simple.yml up -d
+
+# Ver logs para confirmar que inició bien
+docker-compose -f docker-compose.prod.simple.yml logs -f api
+```
+
+### Ver API Keys en Base de Datos
+
+```bash
+# Usar script incluido
+cd /opt/retbot-ai
+docker exec retbot-api python /app/scripts/list_api_keys.py
+```
+
+### Gestionar Modelos de Ollama
+
+```bash
+# Ver modelos instalados
+docker exec retbot-ollama ollama list
+
+# Descargar nuevo modelo
+docker exec retbot-ollama ollama pull qwen2.5-coder:7b
+
+# Eliminar modelo
+docker exec retbot-ollama ollama rm qwen2.5-coder:3b
+
+# Ver uso de VRAM/RAM
+docker exec retbot-ollama ollama ps
+```
+
+### Health Checks
+
+```bash
+# Health check simple
+curl http://localhost:8000/health
+
+# Health check completo (muestra todos los servicios)
+curl http://localhost:8000/health/full
+
+# Desde otra máquina
+curl http://TU_IP_PUBLICA:8000/health
+```
+
+### Backup de Datos
+
+```bash
+# Backup de base de datos SQLite
+cp /opt/retbot-ai/data/retbot.db /opt/retbot-ai/data/retbot.db.backup.$(date +%Y%m%d)
+
+# Backup de modelos de Ollama
+tar -czf ollama_backup_$(date +%Y%m%d).tar.gz /opt/retbot-ai/ollama_data/
+
+# Backup de logs
+tar -czf logs_backup_$(date +%Y%m%d).tar.gz /opt/retbot-ai/logs/
+```
+
+### Limpieza
+
+```bash
+# Limpiar contenedores detenidos
+docker container prune -f
+
+# Limpiar imágenes no usadas
+docker image prune -f
+
+# Limpiar todo (cuidado!)
+docker system prune -a -f
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Error: "Not authenticated"
+
+**Causa:** La API Key no es válida o no está en la base de datos.
+
+**Solución:**
+1. Verifica que la API Key empieza con `key_`
+2. Asegúrate de haber copiado la key completa del modal
+3. Verifica que la key está activa en la Web UI
+4. Si la perdiste, crea una nueva API Key
+
+```bash
+# Ver API Keys en BD
+docker exec retbot-api python /app/scripts/list_api_keys.py
+```
+
+### Error: "Ollama no está disponible"
+
+**Causa:** Ollama no está corriendo o no es accesible.
+
+**Solución:**
+```bash
+# Verificar si Ollama está corriendo
+docker-compose -f docker-compose.prod.simple.yml ps ollama
+
+# Ver logs de Ollama
+docker logs retbot-ollama
+
+# Reiniciar Ollama
+docker-compose -f docker-compose.prod.simple.yml restart ollama
+
+# Verificar conexión desde API
+docker exec retbot-api curl http://ollama:11434/api/tags
+```
+
+### Error: "Address already in use"
+
+**Causa:** El puerto 8000 o 11434 ya está en uso.
+
+**Solución:**
+```bash
+# Ver qué está usando el puerto
+netstat -tlnp | grep 8000
+netstat -tlnp | grep 11434
+
+# Detener proceso conflictivo
+kill -9 <PID>
+
+# O cambiar puerto en docker-compose.yml
+```
+
+### Error: "ModuleNotFoundError: No module named 'core'"
+
+**Causa:** El código no se actualizó después de git pull.
+
+**Solución:**
+```bash
+# Asegurar que estás en el directorio correcto
+cd /opt/retbot-ai
+
+# Verificar que el código se actualizó
+git log -1 --oneline
+
+# Reiniciar contenedores
+docker-compose -f docker-compose.prod.simple.yml down
+docker-compose -f docker-compose.prod.simple.yml up -d
+```
+
+### Ollama usa CPU en lugar de GPU
+
+**Causa:** No se detectó GPU NVIDIA o falta configuración.
+
+**Solución:**
+```bash
+# Verificar si hay GPU
+nvidia-smi
+
+# Verificar NVIDIA Container Toolkit
+docker run --rm --gpus all nvidia/cuda:11.0.3-base-ubuntu20.04 nvidia-smi
+
+# Si no hay GPU, Ollama usará CPU automáticamente (más lento)
+```
+
+### Slow Response / Timeouts
+
+**Causa:** Modelo muy grande para el hardware disponible.
+
+**Solución:**
+1. Usar modelo más pequeño (ej: `qwen2.5-coder:3b`)
+2. Reducir `OLLAMA_CONTEXT_LENGTH` en `.env`
+3. Agregar más RAM o GPU
+
+---
+
+##  Configuración para Kamatera
+
+### Requisitos Recomendados
+
+| Componente | Mínimo | Recomendado |
+|------------|--------|-------------|
+| **CPU** | 2 cores | 4+ cores |
+| **RAM** | 4GB | 8GB+ |
+| **Disco** | 50GB SSD | 100GB SSD |
+| **OS** | Ubuntu 20.04 | Ubuntu 22.04 |
+| **Firewall** | Puerto 8000 abierto | Puerto 8000 + 22 (SSH) |
+
+### Pasos en Kamatera Console
+
+1. **Crear Servidor:**
+   - Ir a [Kamatera Console](https://console.kamatera.com/)
+   - Click en "Create Server"
+   - Seleccionar Ubuntu 22.04 LTS
+   - Configurar CPU/RAM según tabla arriba
+   - Agregar 50-100GB SSD
+
+2. **Configurar Firewall:**
+   - En Kamatera Console, ir a "Firewall"
+   - Crear nuevo firewall o editar existente
+   - Agregar reglas:
+     - Puerto 22 (SSH) - Tu IP
+     - Puerto 8000 (API) - 0.0.0.0/0 (público)
+
+3. **IP Pública:**
+   - Anotar la IP pública del servidor
+   - Ejemplo: `103.101.201.229`
+
+4. **Conectar por SSH:**
+   ```bash
+   ssh root@103.101.201.229
+   ```
+
+5. **Seguir guía de instalación** (ver arriba)
+
+### URLs de Acceso
+
+Una vez instalado:
+
+| Servicio | URL |
+|----------|-----|
+| **Web UI Admin** | `http://103.101.201.229:8000/admin/ui` |
+| **API Endpoint** | `http://103.101.201.229:8000/api/v1` |
+| **Health Check** | `http://103.101.201.229:8000/health` |
+| **OpenCode Config** | `http://103.101.201.229:8000/admin/opencode-config` |
+
+### Configuración OpenCode para Kamatera
+
+| Campo | Valor |
+|-------|-------|
+| **ID Proveedor** | `retbot` |
+| **Nombre** | `RETBOT AI` |
+| **URL Base** | `http://103.101.201.229:8000/api/v1` |
+| **API Key** | `key_TU_API_KEY_AQUI` |
+| **Modelo** | `qwen2.5-coder:3b` |
 
 ---
 
