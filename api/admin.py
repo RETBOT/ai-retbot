@@ -413,6 +413,32 @@ async def create_api_key(
     }
 
 
+@router.get("/api-keys/{key_id}/reveal")
+async def reveal_api_key(
+    key_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Ver API Key completa (solo para admin o dueño)"""
+    result = await session.execute(select(APIKey).where(APIKey.id == key_id))
+    api_key = result.scalar_one_or_none()
+    
+    if not api_key:
+        raise HTTPException(status_code=404, detail="API Key no encontrada")
+    
+    # Verificar permisos
+    if api_key.user_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="No tienes permiso para ver esta API Key")
+    
+    return {
+        "id": api_key.id,
+        "name": api_key.name,
+        "key": api_key.key_hash,  # Retorna la key completa
+        "is_active": api_key.is_active,
+        "created_at": api_key.created_at.isoformat() if api_key.created_at else None
+    }
+
+
 @router.delete("/api-keys/{key_id}")
 async def revoke_api_key(
     key_id: str,
