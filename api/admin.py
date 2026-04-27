@@ -4,8 +4,9 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
-from core.database import User, Job, AuditLog, get_session
+from core.database import User, Job, AuditLog, APIKey, get_session
 from core.auth import hash_password, verify_password, get_current_user, get_current_admin
+import secrets
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -52,6 +53,19 @@ class AuditLogResponse(BaseModel):
     details: Optional[str]
     ip_address: Optional[str]
     created_at: str
+
+
+class APIKeyResponse(BaseModel):
+    id: str
+    user_id: Optional[str]
+    name: str
+    key_hash: str
+    is_active: bool
+    created_at: str
+
+
+class CreateAPIKeyRequest(BaseModel):
+    name: str
 
 
 @router.post("/users", response_model=UserResponse)
@@ -338,6 +352,100 @@ async def generate_opencode_config(
         }
     }
     
+
+# ============================================
+# API Keys Endpoints
+# ============================================
+
+@router.get("/api-keys", response_model=List[APIKeyResponse])
+async def list_api_keys(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Listar API Keys del usuario actual"""
+    result = await session.execute(
+        select(APIKey)
+        .where(APIKey.user_id == user.id)
+        .order_by(APIKey.created_at.desc())
+    )
+    keys = result.scalars().all()
+    return [APIKeyResponse(**k.to_dict()) for k in keys]
+
+
+@router.post("/api-keys")
+async def create_api_key(
+    data: CreateAPIKeyRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Crear nueva API Key para el usuario actual"""
+    # Generar API Key única
+    api_key_plain = f"rb_{secrets.token_hex(16)}"
+    
+    # Crear API Key en DB
+    api_key = APIKey(
+        user_id=user.id,
+        name=data.name,
+        key_hash=api_key_plain,  # En producción debería hashearse
+        is_active=True
+    )
+    session.add(api_key)
+    
+    # Log de auditoría
+    audit = AuditLog(
+        user_id=user.id,
+        action="api_key_created",
+        details=f"API Key creada: {data.name}",
+        ip_address=request.client.host
+    )
+    session.add(audit)
+    
+    await session.commit()
+    await session.refresh(api_key)
+    
+    # Retornar API Key (solo se muestra una vez)
+    return {
+        "key": api_key_plain,
+        "id": api_key.id,
+        "name": api_key.name,
+        "created_at": api_key.created_at.isoformat() if api_key.created_at else None
+    }
+
+
+@router.delete("/api-keys/{key_id}")
+async def revoke_api_key(
+    key_id: str,
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Revocar/eliminar API Key"""
+    result = await session.execute(select(APIKey).where(APIKey.id == key_id))
+    api_key = result.scalar_one_or_none()
+    
+    if not api_key:
+        raise HTTPException(status_code=404, detail="API Key no encontrada")
+    
+    # Verificar que la key pertenece al usuario (o es admin)
+    if api_key.user_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="No tienes permiso para revocar esta API Key")
+    
+    # Eliminar API Key
+    await session.delete(api_key)
+    
+    # Log de auditoría
+    audit = AuditLog(
+        user_id=user.id,
+        action="api_key_revoked",
+        details=f"API Key revocada: {api_key.name}",
+        ip_address=request.client.host
+    )
+    session.add(audit)
+    
+    await session.commit()
+    
+    return {"message": "API Key revocada exitosamente"}
     return {
         "message": "Configuración generada exitosamente",
         "config": config,

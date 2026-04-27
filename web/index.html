@@ -824,35 +824,45 @@
         // API Keys
         async function loadApiKeys() {
             try {
+                console.log('Cargando API Keys...');
                 const res = await fetch(`${API_BASE}/admin/api-keys`, { headers: getHeaders() });
+                
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                
                 const data = await res.json();
+                console.log('API Keys response:', data);
                 
                 // La respuesta puede ser un array directo o un objeto con una propiedad
-                const keys = Array.isArray(data) ? data : (data.keys || []);
+                const keys = Array.isArray(data) ? data : (data.keys || data.api_keys || []);
+                console.log('Keys array:', keys);
                 
                 const container = document.getElementById('api-keys-list');
                 
                 if (keys.length === 0) {
-                    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-light);">No hay API Keys creadas</div>';
+                    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-light);">No hay API Keys creadas<br><small>Usa el formulario arriba para crear una</small></div>';
                     return;
                 }
                 
-                container.innerHTML = keys.map(key => `
+                container.innerHTML = keys.map(key => {
+                    console.log('Key:', key);
+                    return `
                     <div style="padding: 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
                         <div>
-                            <strong>${key.name}</strong>
-                            <div style="font-size: 0.875rem; color: var(--text-light); font-family: monospace;">${key.key_hash?.slice(0, 20)}...</div>
+                            <strong>${key.name || 'Sin nombre'}</strong>
+                            <div style="font-size: 0.875rem; color: var(--text-light); font-family: monospace;">${key.key_hash?.slice(0, 20) || 'N/A'}...</div>
                         </div>
                         <div>
                             <span class="badge ${key.is_active ? 'badge-success' : 'badge-danger'}">${key.is_active ? 'Activa' : 'Inactiva'}</span>
                             <button class="btn btn-danger btn-sm" style="margin-left: 0.5rem;" onclick="revokeApiKey('${key.id}')">Revocar</button>
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
                 
             } catch (error) {
                 console.error('Error loading API keys:', error);
-                document.getElementById('api-keys-list').innerHTML = '<div class="alert alert-error">Error: ' + error.message + '</div>';
+                document.getElementById('api-keys-list').innerHTML = '<div class="alert alert-error">Error: ' + error.message + '<br><small>Revisa la consola del navegador (F12) para más detalles</small></div>';
             }
         }
 
@@ -868,19 +878,31 @@
                 const res = await fetch(`${API_BASE}/admin/api-keys`, {
                     method: 'POST',
                     headers: getHeaders(),
-                    body: JSON.stringify({ name })
+                    body: JSON.stringify({ name: name })
                 });
                 
-                const data = await res.json();
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.detail || 'Error al crear API Key');
+                }
                 
-                document.getElementById('new-api-key').textContent = data.key;
+                const data = await res.json();
+                console.log('API Key creada:', data);
+                
+                // Mostrar la API Key creada
+                const apiKey = data.key || data.api_key || data;
+                document.getElementById('new-api-key').textContent = apiKey;
                 document.getElementById('api-key-result').style.display = 'block';
                 document.getElementById('api-key-name').value = '';
                 
-                // Recargar lista
-                setTimeout(loadApiKeys, 1000);
+                // Recargar lista después de 2 segundos
+                setTimeout(() => {
+                    loadApiKeys();
+                    document.getElementById('api-key-result').style.display = 'none';
+                }, 3000);
                 
             } catch (error) {
+                console.error('Error creating API key:', error);
                 alert('Error: ' + error.message);
             }
         }
