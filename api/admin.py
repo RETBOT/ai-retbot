@@ -57,11 +57,11 @@ class AuditLogResponse(BaseModel):
 
 class APIKeyResponse(BaseModel):
     id: str
-    user_id: Optional[str]
+    user_id: Optional[str] = None
     name: str
     key_hash: str
     is_active: bool
-    created_at: str
+    created_at: Optional[str] = None
 
 
 class CreateAPIKeyRequest(BaseModel):
