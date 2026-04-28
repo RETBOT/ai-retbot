@@ -13,7 +13,7 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 def _utc_now():

@@ -313,7 +313,7 @@ async def generate_opencode_config(
     # Detectar URL base
     host = request.headers.get("host", "localhost:8000")
     scheme = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
-    base_url = f"{scheme}://{host}/v1"
+    base_url = f"{scheme}://{host}/api/v1"
     
     config = {
         "$schema": "https://opencode.ai/config.json",
@@ -351,6 +351,16 @@ async def generate_opencode_config(
         }
     }
     
+    return {
+        "message": "Configuración generada exitosamente",
+        "config": config,
+        "instructions": [
+            "1. Copia esta configuración a tu archivo opencode.json",
+            "2. Reemplaza [API_KEY] con tu API key real",
+            "3. Reinicia OpenCode para aplicar los cambios",
+            "4. Alternativa: Guarda como .opencode.json en la raíz de tu proyecto"
+        ]
+    }
 
 # ============================================
 # API Keys Endpoints
@@ -471,16 +481,6 @@ async def revoke_api_key(
     await session.commit()
     
     return {"message": "API Key revocada exitosamente"}
-    return {
-        "message": "Configuración generada exitosamente",
-        "config": config,
-        "instructions": [
-            "1. Copia esta configuración a tu archivo opencode.json",
-            "2. Reemplaza [API_KEY] con tu API key real (usa: python cli/main.py list-api-keys --user {user.username})",
-            "3. Reinicia OpenCode para aplicar los cambios",
-            "4. Alternativa: Guarda como .opencode.json en la raíz de tu proyecto"
-        ]
-    }
 
 
 # Importar settings para PASSWORD_EXPIRE_DAYS
