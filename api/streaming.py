@@ -169,8 +169,8 @@ async def chat_completions_streaming(
                     if content:
                         buffer += content
 
-                        # Agrupa tokens (más fluido)
-                        if len(buffer) > 20:
+                        # Streaming rápido - enviar chunks pequeños
+                        if len(buffer) > 5:
                             yield f"data: {json.dumps({'id': 'chatcmpl-123', 'object': 'chat.completion.chunk', 'choices': [{'delta': {'content': buffer}, 'index': 0, 'finish_reason': None}]})}\n\n"
                             buffer = ""
 
