@@ -176,18 +176,25 @@ async def get_current_user_or_api_key(
     session: AsyncSession = Depends(get_session)
 ) -> User:
     """
-    Obtener usuario desde JWT token O desde API Key (header X-API-Key).
-    Primero intenta API Key, luego JWT.
+    Obtener usuario desde API Key (X-API-Key o Authorization: Bearer) o JWT.
+    Soporta tanto el formato nativo (X-API-Key) como OpenAI-compatible (Bearer).
     """
-    # Intentar API Key primero (header X-API-Key)
+    # Intentar API Key desde header X-API-Key
     api_key = request.headers.get("X-API-Key")
     if api_key:
         user = await get_user_from_api_key(api_key, session)
         if user:
             return user
     
-    # Fallback a JWT token
+    # Intentar Bearer token como API Key (formato OpenAI/OpenCode)
     if credentials:
+        bearer_token = credentials.credentials
+        # Primero intentar como API Key
+        user = await get_user_from_api_key(bearer_token, session)
+        if user:
+            return user
+        
+        # Luego intentar como JWT
         try:
             return await get_current_user(credentials, session)
         except HTTPException:
