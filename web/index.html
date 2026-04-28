@@ -376,6 +376,43 @@
             color: var(--primary);
             text-align: center;
         }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 0.5rem;
+                text-align: center;
+            }
+            .nav-content {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 0.25rem;
+            }
+            .nav-btn {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.8rem;
+            }
+            .cards-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 0.75rem;
+            }
+            .card { padding: 1rem; }
+            .card-value { font-size: 1.5rem; }
+            .main { padding: 1rem; }
+            table { font-size: 0.8rem; }
+            th, td { padding: 0.5rem; }
+            #create-user-card > div:first-of-type {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .cards-grid { grid-template-columns: 1fr; }
+            .logo { font-size: 1.1rem; }
+            .nav-btn { font-size: 0.7rem; padding: 0.4rem 0.5rem; }
+            .btn-sm { padding: 0.2rem 0.5rem; font-size: 0.65rem; }
+        }
     </style>
 </head>
 <body>
@@ -482,15 +519,62 @@
         <div id="users" class="section">
             <h1 class="section-title">👥 Usuarios</h1>
             
-            <div class="table-container">
+            <!-- Formulario crear usuario (solo admin) -->
+            <div class="card" style="margin-bottom: 1.5rem;" id="create-user-card">
+                <h3 style="margin-bottom: 1rem;">➕ Crear Nuevo Usuario</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Usuario</label>
+                        <input type="text" id="new-username" class="form-input" placeholder="username">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Contraseña</label>
+                        <input type="password" id="new-password" class="form-input" placeholder="mínimo 8 caracteres">
+                    </div>
+                    <button class="btn btn-primary" onclick="createUser()" style="height: fit-content;">➕ Crear</button>
+                </div>
+                <div style="margin-top: 0.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="new-is-admin"> ¿Es administrador?
+                    </label>
+                </div>
+                <div id="create-user-result" style="margin-top: 1rem; display: none;"></div>
+            </div>
+            
+            <!-- Modal editar usuario -->
+            <div id="edit-user-modal" class="login-modal" style="display: none;">
+                <div class="login-box">
+                    <h2 class="login-title">✏️ Editar Usuario</h2>
+                    <input type="hidden" id="edit-user-id">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" id="edit-username" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Nueva Contraseña (dejar vacío para no cambiar)</label>
+                        <input type="password" id="edit-password" class="form-input" placeholder="••••••••">
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="edit-is-admin"> ¿Es administrador?
+                        </label>
+                    </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <button class="btn btn-primary" onclick="saveUserEdit()" style="flex: 1;">💾 Guardar</button>
+                        <button class="btn btn-danger" onclick="closeEditModal()" style="flex: 1;">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-container" style="overflow-x: auto;">
                 <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Username</th>
                             <th>Admin</th>
                             <th>Activo</th>
                             <th>Creado</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="users-table">
@@ -780,21 +864,156 @@
         async function loadUsers() {
             try {
                 const res = await fetch(`${API_BASE}/admin/users`, { headers: getHeaders() });
+                
+                if (res.status === 403 || res.status === 401) {
+                    document.getElementById('create-user-card').style.display = 'none';
+                    document.getElementById('users-table').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--text-light);">🔒 Solo administradores pueden ver usuarios</td></tr>';
+                    return;
+                }
+                
+                document.getElementById('create-user-card').style.display = 'block';
                 const users = await res.json();
                 
                 const tbody = document.getElementById('users-table');
                 tbody.innerHTML = users.map(user => `
                     <tr>
-                        <td>${user.id.slice(0, 8)}...</td>
-                        <td>${user.username}</td>
+                        <td><strong>${user.username}</strong></td>
                         <td><span class="badge ${user.is_admin ? 'badge-success' : 'badge-info'}">${user.is_admin ? 'Admin' : 'User'}</span></td>
                         <td><span class="badge ${user.is_active ? 'badge-success' : 'badge-danger'}">${user.is_active ? 'Activo' : 'Inactivo'}</span></td>
-                        <td>${new Date(user.created_at).toLocaleString()}</td>
+                        <td style="font-size:0.8rem;">${new Date(user.created_at).toLocaleDateString()}</td>
+                        <td>
+                            <div style="display:flex;gap:0.25rem;flex-wrap:wrap;">
+                                <button class="btn btn-primary btn-sm" onclick="openEditModal('${user.id}','${user.username}',${user.is_admin})" title="Editar">✏️</button>
+                                ${user.is_active 
+                                    ? `<button class="btn btn-danger btn-sm" onclick="toggleUserActive('${user.id}',false,'${user.username}')" title="Desactivar">🚫</button>`
+                                    : `<button class="btn btn-primary btn-sm" onclick="toggleUserActive('${user.id}',true,'${user.username}')" title="Activar">✅</button>`
+                                }
+                            </div>
+                        </td>
                     </tr>
                 `).join('');
                 
             } catch (error) {
                 document.getElementById('users-table').innerHTML = '<tr><td colspan="5" class="alert alert-error">Error: ' + error.message + '</td></tr>';
+            }
+        }
+
+        // Crear usuario
+        async function createUser() {
+            const username = document.getElementById('new-username').value.trim();
+            const password = document.getElementById('new-password').value;
+            const isAdmin = document.getElementById('new-is-admin').checked;
+            const resultDiv = document.getElementById('create-user-result');
+            
+            if (!username || !password) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-error">Usuario y contraseña son obligatorios</div>';
+                return;
+            }
+            
+            if (password.length < 8) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-error">La contraseña debe tener al menos 8 caracteres</div>';
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_BASE}/admin/users`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ username, password, is_admin: isAdmin })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    resultDiv.style.display = 'block';
+                    resultDiv.innerHTML = `<div class="alert alert-success">✅ Usuario <strong>${username}</strong> creado exitosamente</div>`;
+                    document.getElementById('new-username').value = '';
+                    document.getElementById('new-password').value = '';
+                    document.getElementById('new-is-admin').checked = false;
+                    loadUsers();
+                    setTimeout(() => { resultDiv.style.display = 'none'; }, 3000);
+                } else {
+                    resultDiv.style.display = 'block';
+                    resultDiv.innerHTML = `<div class="alert alert-error">❌ ${data.detail || 'Error al crear usuario'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Activar/desactivar usuario
+        async function toggleUserActive(userId, activate, username) {
+            const action = activate ? 'activar' : 'desactivar';
+            if (!confirm(`¿Seguro que quieres ${action} a "${username}"?`)) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ is_active: activate })
+                });
+                
+                if (res.ok) {
+                    loadUsers();
+                } else {
+                    const data = await res.json();
+                    alert('Error: ' + (data.detail || 'No se pudo completar'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Abrir modal de edición
+        function openEditModal(userId, username, isAdmin) {
+            document.getElementById('edit-user-id').value = userId;
+            document.getElementById('edit-username').value = username;
+            document.getElementById('edit-is-admin').checked = isAdmin;
+            document.getElementById('edit-password').value = '';
+            document.getElementById('edit-user-modal').style.display = 'flex';
+        }
+
+        // Cerrar modal
+        function closeEditModal() {
+            document.getElementById('edit-user-modal').style.display = 'none';
+        }
+
+        // Guardar edición
+        async function saveUserEdit() {
+            const userId = document.getElementById('edit-user-id').value;
+            const username = document.getElementById('edit-username').value.trim();
+            const password = document.getElementById('edit-password').value;
+            const isAdmin = document.getElementById('edit-is-admin').checked;
+            
+            if (!username) {
+                alert('Username es obligatorio');
+                return;
+            }
+            
+            const body = { username, is_admin: isAdmin };
+            if (password && password.length >= 8) {
+                body.password = password;
+            }
+            
+            try {
+                const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify(body)
+                });
+                
+                if (res.ok) {
+                    closeEditModal();
+                    loadUsers();
+                } else {
+                    const data = await res.json();
+                    alert('Error: ' + (data.detail || 'No se pudo guardar'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
             }
         }
 
