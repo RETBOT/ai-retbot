@@ -40,24 +40,25 @@ async def test_get_user_from_api_key_function(client, db_session, test_user):
     """Test la función get_user_from_api_key"""
     from core.database import APIKey
     from core.auth import get_user_from_api_key
-    
-    # Crear API key
+
+    # NOTA: RETBOT guarda las API keys en TEXTO PLANO (key_hash == valor de
+    # la key). Ver server.py ("Guardar sin hash") y core/auth.py
+    # (APIKey.key_hash == api_key). El test guarda la key directa.
     api_key = "rb_test_valid_key_123"
-    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-    
+
     db_key = APIKey(
         id=str(uuid.uuid4()),
         user_id=test_user.id,
         name="Valid Key",
-        key_hash=key_hash,
+        key_hash=api_key,  # texto plano (convención real del proyecto)
         is_active=True
     )
     db_session.add(db_key)
     await db_session.commit()
-    
+
     # Test función
     user = await get_user_from_api_key(api_key, db_session)
-    
+
     assert user is not None
     assert user.id == test_user.id
     assert user.username == test_user.username
@@ -105,15 +106,14 @@ async def test_api_key_updates_last_used(client, db_session, test_user):
     from core.database import APIKey
     from core.auth import get_user_from_api_key
     
-    # Crear API key
+    # Crear API key (texto plano, convención real del proyecto)
     api_key = "rb_lastused_key_123"
-    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-    
+
     db_key = APIKey(
         id=str(uuid.uuid4()),
         user_id=test_user.id,
         name="Last Used Key",
-        key_hash=key_hash,
+        key_hash=api_key,
         is_active=True,
         last_used_at=None
     )
@@ -135,15 +135,14 @@ async def test_streaming_endpoint_with_api_key(client, db_session, test_user):
     """Test que el endpoint streaming acepta API key"""
     from core.database import APIKey
     
-    # Crear API key
+    # NOTA: las API keys se guardan en texto plano (key_hash == valor)
     api_key = "rb_streaming_key_123"
-    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-    
+
     db_key = APIKey(
         id=str(uuid.uuid4()),
         user_id=test_user.id,
         name="Streaming Key",
-        key_hash=key_hash,
+        key_hash=api_key,
         is_active=True
     )
     db_session.add(db_key)
@@ -151,7 +150,7 @@ async def test_streaming_endpoint_with_api_key(client, db_session, test_user):
     
     # Llamar endpoint con API key (va a fallar por Ollama no disponible, pero auth debe pasar)
     response = await client.post(
-        "/v1/chat/completions",
+        "/api/v1/chat/completions",
         headers={"X-API-Key": api_key},
         json={
             "messages": [{"role": "user", "content": "test"}],
@@ -168,7 +167,7 @@ async def test_streaming_endpoint_with_api_key(client, db_session, test_user):
 async def test_streaming_endpoint_rejects_invalid_api_key(client):
     """Test que el endpoint streaming rechaza API key inválida"""
     response = await client.post(
-        "/v1/chat/completions",
+        "/api/v1/chat/completions",
         headers={"X-API-Key": "rb_invalid_key_12345"},
         json={
             "messages": [{"role": "user", "content": "test"}],
@@ -190,7 +189,7 @@ async def test_streaming_endpoint_accepts_bearer_token(client, test_user):
     })
     
     response = await client.post(
-        "/v1/chat/completions",
+        "/api/v1/chat/completions",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "messages": [{"role": "user", "content": "test"}],
@@ -208,15 +207,14 @@ async def test_jobs_endpoint_with_api_key(client, db_session, test_user):
     """Test que el endpoint jobs acepta API key"""
     from core.database import APIKey
     
-    # Crear API key
+    # NOTA: las API keys se guardan en texto plano (key_hash == valor)
     api_key = "rb_jobs_key_123"
-    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-    
+
     db_key = APIKey(
         id=str(uuid.uuid4()),
         user_id=test_user.id,
         name="Jobs Key",
-        key_hash=key_hash,
+        key_hash=api_key,
         is_active=True
     )
     db_session.add(db_key)
@@ -224,7 +222,7 @@ async def test_jobs_endpoint_with_api_key(client, db_session, test_user):
     
     # Llamar endpoint con API key
     response = await client.post(
-        "/agent/chat/completions",
+        "/api/v1/chat/completions",
         headers={"X-API-Key": api_key},
         json={
             "messages": [{"role": "user", "content": "test"}],

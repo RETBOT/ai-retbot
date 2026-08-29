@@ -12,9 +12,11 @@ async def test_health_endpoint(client):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["status"] == "ok"
+    # "ok" cuando Ollama está arriba; "degraded" sin Ollama (el endpoint no falla)
+    assert data["status"] in ("ok", "degraded")
     assert "model" in data
-    assert "model_type" in data
+    assert "ollama" in data
+    assert "database" in data
 
 
 @pytest.mark.asyncio
@@ -32,8 +34,8 @@ async def test_root_endpoint(client):
 
 @pytest.mark.asyncio
 async def test_list_models_endpoint(client):
-    """Test que el endpoint de modelos responde"""
-    response = await client.get("/v1/models")
+    """Test que el endpoint de modelos responde (formato OpenAI compatible)"""
+    response = await client.get("/api/v1/models")
     
     assert response.status_code == 200
     data = response.json()
@@ -41,6 +43,7 @@ async def test_list_models_endpoint(client):
     assert data["object"] == "list"
     assert "data" in data
     assert isinstance(data["data"], list)
+    assert len(data["data"]) >= 1  # al menos el modelo default (fallback sin Ollama)
 
 
 @pytest.mark.asyncio
@@ -59,4 +62,6 @@ async def test_auth_protected_endpoint_without_token(client):
     """Test que endpoints protegidos rechazan requests sin token"""
     response = await client.get("/auth/me")
     
-    assert response.status_code == 403  # HTTPBearer devuelve 403 cuando no hay token
+    # El proyecto usa HTTPBearer(auto_error=False) + manejo manual → 401
+    # (ver core/auth.py::get_current_user con credentials=None)
+    assert response.status_code == 401

@@ -15,6 +15,7 @@ import time
 BASE_URL = "http://localhost:8000"
 API_KEY = "demo_key_123"
 HEADERS = {"X-API-Key": API_KEY}
+CHAT_URL = f"{BASE_URL}/api/v1/chat/completions"
 
 
 @pytest.mark.asyncio
@@ -22,7 +23,7 @@ async def test_rate_limit_headers():
     """Verificar que los headers de rate limiting se incluyen en las respuestas"""
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(
-            f"{BASE_URL}/v1/chat/completions",
+            CHAT_URL,
             json={"messages": [{"role": "user", "content": "Hola"}]},
             headers=HEADERS
         )
