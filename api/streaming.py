@@ -105,6 +105,10 @@ async def chat_completions_streaming(
     messages = body.get("messages", [])
     model = body.get("model", settings.MODEL_NAME)
     stream = body.get("stream", True)
+
+    # max_tokens: validar ANTES de tocar Ollama (400 uniforme estilo OpenAI)
+    from core.models import _parse_max_tokens
+    num_predict = _parse_max_tokens(body)
     
     # Encontrar último mensaje del usuario
     user_message = ""
@@ -133,17 +137,16 @@ async def chat_completions_streaming(
         ollama_url = f"{settings.OLLAMA_URL}/api/chat"
         
         try:
+            from core.models import build_ollama_payload
             async with stream_client.stream(
                 "POST",
                 ollama_url,
-                json={
-                    "model": model_id,
-                    "messages": full_messages,
-                    "stream": True,
-                    "options": {
-                        "keep_alive": 300
-                    }
-                }
+                json=build_ollama_payload(
+                    model_id,
+                    full_messages,
+                    stream=True,
+                    num_predict=num_predict
+                )
             ) as response:
                 
                 # Primer chunk (rol)

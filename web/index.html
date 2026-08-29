@@ -1182,6 +1182,13 @@
                 }
                 
                 const data = await res.json();
+                
+                // Keys hasheadas (HMAC) no son recuperables - mostrar mensaje del server
+                if (data.key == null) {
+                    alert(data.message || 'Esta API key fue hasheada y no puede recuperarse.');
+                    return;
+                }
+                
                 const apiKey = data.key;
                 
                 // Mostrar en modal

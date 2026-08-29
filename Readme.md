@@ -811,9 +811,12 @@ curl, wget, tar, gzip, mkdir, rm, cp, mv
 
 | Endpoint | Método | Auth | Descripción |
 |----------|--------|------|-------------|
-| `/v1/chat/completions` | POST | API Key/JWT | Chat con streaming SSE |
+| `/v1/chat/completions` | POST | API Key/JWT | Chat con streaming SSE. Soporta `max_tokens` (entero >= 1, mapeado a `options.num_predict` de Ollama) |
 | `/agent/chat/completions` | POST | API Key/JWT | Chat con **soporte de tools** |
 | `/v1/models` | GET | - | Listar modelos disponibles desde Ollama |
+
+> **`max_tokens`**: opcional. Si se omite, el modelo genera sin límite (comportamiento
+> default). Valores inválidos (0, negativos, bool, no-numéricos) devuelven HTTP 400.
 
 ### Administración
 

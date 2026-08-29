@@ -3,9 +3,9 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from core.database import User, Job, AuditLog, APIKey, get_session
-from core.auth import hash_password, verify_password, get_current_user, get_current_admin
+from core.auth import hash_password, verify_password, get_current_user, get_current_admin, hash_api_key, mask_api_key_hash, key_storage_format
 import secrets
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -60,8 +60,14 @@ class APIKeyResponse(BaseModel):
     user_id: Optional[str] = None
     name: str
     key_hash: str
+    storage_format: str
     is_active: bool
     created_at: Optional[str] = None
+
+    @field_validator("key_hash")
+    @classmethod
+    def mask_key_hash(cls, v: str) -> str:
+        return mask_api_key_hash(v)
 
 
 class CreateAPIKeyRequest(BaseModel):
@@ -277,7 +283,6 @@ async def generate_opencode_config(
     """
     from core.database import APIKey
     from core.models import SYSTEM_PROMPT
-    import hashlib
     
     # Buscar API key existente del usuario
     result = await session.execute(
@@ -299,7 +304,7 @@ async def generate_opencode_config(
             id=str(uuid.uuid4()),
             user_id=user.id,
             name="OpenCode Auto-Generated",
-            key_hash=api_key_plain,  # Guardar sin hash
+            key_hash=hash_api_key(api_key_plain),
             permissions="chat",
             is_active=True
         )
@@ -382,7 +387,10 @@ async def list_api_keys(
         .order_by(APIKey.created_at.desc())
     )
     keys = result.scalars().all()
-    return [APIKeyResponse(**k.to_dict()) for k in keys]
+    return [
+        APIKeyResponse(**k.to_dict(), storage_format=key_storage_format(k.key_hash))
+        for k in keys
+    ]
 
 
 @router.post("/api-keys")
@@ -396,11 +404,11 @@ async def create_api_key(
     # Generar API Key única (prefix genérico)
     api_key_plain = f"key_{secrets.token_hex(16)}"
     
-    # Crear API Key en DB (guardar la key tal cual para poder revelarla después)
+    # Crear API Key en DB (guardar el hash de la key)
     api_key = APIKey(
         user_id=user.id,
         name=data.name,
-        key_hash=api_key_plain,  # Guardar la key sin hashear
+        key_hash=hash_api_key(api_key_plain),
         is_active=True
     )
     session.add(api_key)
@@ -443,12 +451,26 @@ async def reveal_api_key(
     if api_key.user_id != user.id and not user.is_admin:
         raise HTTPException(status_code=403, detail="No tienes permiso para ver esta API Key")
     
+    if key_storage_format(api_key.key_hash) == "hmac":
+        # La key fue hasheada y no puede recuperarse
+        return {
+            "id": api_key.id,
+            "name": api_key.name,
+            "key": None,
+            "is_active": api_key.is_active,
+            "created_at": api_key.created_at.isoformat() if api_key.created_at else None,
+            "storage_format": "hmac",
+            "message": "La API key fue hasheada y no puede recuperarse"
+        }
+    
+    # Legacy: la key se almacenó en claro (pre-migración) y puede revelarse
     return {
         "id": api_key.id,
         "name": api_key.name,
-        "key": api_key.key_hash,  # Retorna la key completa
+        "key": api_key.key_hash,
         "is_active": api_key.is_active,
-        "created_at": api_key.created_at.isoformat() if api_key.created_at else None
+        "created_at": api_key.created_at.isoformat() if api_key.created_at else None,
+        "storage_format": "legacy"
     }
 
 

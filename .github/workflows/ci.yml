@@ -10,9 +10,9 @@ jobs:
     name: Unit (MCP + tools + auth) - sin Ollama
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -26,7 +26,8 @@ jobs:
         run: |
           python -m pytest tests/test_mcp.py tests/test_tools.py \
             tests/test_smoke.py tests/test_integration.py \
-            tests/test_api_keys.py -q
+            tests/test_api_keys.py tests/test_auth_hash.py \
+            tests/test_max_tokens.py -q
 
   integration:
     name: Integracion (API + Ollama) - server vivo
@@ -36,9 +37,9 @@ jobs:
     env:
       OLLAMA_MODEL: qwen2.5-coder:0.5b
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -75,7 +76,7 @@ jobs:
           import asyncio, uuid
           from datetime import datetime, timedelta, timezone
 
-          from core.auth import hash_password
+          from core.auth import hash_password, hash_api_key
           from core.config import settings
           from core.database import APIKey, User, async_session, init_db
 
@@ -92,12 +93,15 @@ jobs:
                       + timedelta(days=settings.PASSWORD_EXPIRE_DAYS),
                   )
                   s.add(user)
+                  # demo_key_123 -> formato hmac (camino nuevo)
+                  # otra_api_key  -> formato legacy en claro (ejercita upgrade-on-access
+                  #                   contra el servidor vivo: se migra sola al primer uso)
                   for key in ("demo_key_123", "otra_api_key"):
                       s.add(APIKey(
                           id=str(uuid.uuid4()),
                           user_id=user.id,
                           name=f"ci_{key}",
-                          key_hash=key,  # texto plano (convencion del proyecto)
+                          key_hash=hash_api_key(key) if key == "demo_key_123" else key,
                           is_active=True,
                       ))
                   await s.commit()

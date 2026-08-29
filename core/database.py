@@ -98,7 +98,7 @@ class APIKey(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)  # Nullable para API Keys auto-generadas
     name = Column(String, nullable=False)  # Descripción: "OpenCode Desktop", "CLI", etc.
-    key_hash = Column(String, nullable=False, index=True)  # SHA256 hash de la key
+    key_hash = Column(String, nullable=False, index=True)  # HMAC-SHA256 con prefijo 'hmac:' (o valor legacy pre-migración, sin prefijo)
     permissions = Column(String, default="chat")  # "chat", "chat,admin", etc.
     is_active = Column(Boolean, default=True)
     last_used_at = Column(DateTime, nullable=True)

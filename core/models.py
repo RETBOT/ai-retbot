@@ -2,9 +2,41 @@ import requests
 import json
 import logging
 from typing import Optional, Dict, Any
+from fastapi import HTTPException
 from core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def build_ollama_payload(
+    model: str,
+    messages: list,
+    stream: bool,
+    keep_alive: int = 300,
+    num_predict: Optional[int] = None
+) -> dict:
+    """Construir el payload para la API de Ollama /api/chat"""
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": stream,
+        "options": {
+            "keep_alive": keep_alive
+        }
+    }
+    if num_predict is not None and num_predict > 0:
+        payload["options"]["num_predict"] = num_predict
+    return payload
+
+
+def _parse_max_tokens(body: dict) -> Optional[int]:
+    """Extraer y validar max_tokens del body (positivo entero)"""
+    if "max_tokens" not in body:
+        return None
+    valor = body.get("max_tokens")
+    if isinstance(valor, bool) or not isinstance(valor, int) or valor < 1:
+        raise HTTPException(status_code=400, detail="max_tokens must be a positive integer")
+    return valor
 
 
 class OllamaProvider:
@@ -67,8 +99,13 @@ class OllamaProvider:
         
         return True
     
-    def chat(self, message: str, system_prompt: Optional[str] = None) -> str:
-        """Enviar mensaje a Ollama"""
+    def chat(
+        self,
+        message: str,
+        system_prompt: Optional[str] = None,
+        num_predict: Optional[int] = None
+    ) -> str:
+        """Enviar mensaje a Ollama (num_predict = limite de tokens, opcional)"""
         # Verificar si Ollama está disponible
         if not self.is_available():
             raise Exception(
@@ -93,11 +130,12 @@ class OllamaProvider:
         try:
             response = requests.post(
                 f"{self.url}/api/chat",
-                json={
-                    "model": self.model_name,
-                    "messages": messages,
-                    "stream": False
-                },
+                json=build_ollama_payload(
+                    self.model_name,
+                    messages,
+                    stream=False,
+                    num_predict=num_predict
+                ),
                 timeout=180
             )
             response.raise_for_status()

@@ -135,3 +135,45 @@ async def test_chat_rejects_invalid_key():
             },
         )
     assert response.status_code == 401
+
+
+@pytest.mark.skipif(not live_env, reason="Server u Ollama no disponibles (corren en CI)")
+async def test_chat_honors_max_tokens():
+    """max_tokens=1 -> el modelo genera UNA respuesta corta (se respeta el limite).
+
+    Verifica el mapeo max_tokens -> options.num_predict de Ollama en el
+    pipeline REAL (server vivo). Con limite de 1 token la respuesta no puede
+    extenderse: el assert de <= 3 palabras es tolerante (el SSE puede traer
+    el token partido en 2 chunks) pero detecta un limite ignorado.
+    """
+    async with httpx.AsyncClient(timeout=120) as client:
+        response = await client.post(
+            CHAT_URL,
+            headers={"X-API-Key": API_KEY},
+            json={
+                "model": settings.MODEL_NAME,
+                "messages": [{"role": "user", "content": "Hola, responde libremente"}],
+                "stream": True,
+                "max_tokens": 1,
+            },
+        )
+
+    assert response.status_code == 200, f"status {response.status_code}: {response.text[:300]}"
+
+    import json
+
+    content_parts = []
+    for line in response.text.splitlines():
+        if line.startswith("data: "):
+            try:
+                chunk = json.loads(line[6:])
+            except json.JSONDecodeError:
+                continue
+            delta = chunk.get("choices", [{}])[0].get("delta", {})
+            if delta.get("content"):
+                content_parts.append(delta["content"])
+
+    full = "".join(content_parts)
+    assert full.strip(), "El modelo no genero contenido (respuesta vacia)"
+    # Con num_predict=1 la respuesta debe ser de 1 token (<=3 palabras tolerando chunks)
+    assert len(full.split()) <= 3, f"max_tokens ignorado? Respuesta: {full[:200]}"

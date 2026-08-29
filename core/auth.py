@@ -2,6 +2,8 @@ import secrets
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import hashlib
+import hmac
 import bcrypt
 from jose import JWTError, jwt
 from fastapi import HTTPException, Depends, Request
@@ -33,6 +35,34 @@ def verify_password(password: str, password_hash: str) -> bool:
     pwd = password.encode('utf-8')
     hashh = password_hash.encode('utf-8')
     return bcrypt.checkpw(pwd, hashh)
+
+
+def hash_api_key(key: str) -> str:
+    """Hashear una API key con HMAC-SHA256 y prefijo 'hmac:'"""
+    return "hmac:" + hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        key.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+
+
+def verify_api_key(key: str, stored: str) -> bool:
+    """Verificar una API key contra el valor almacenado (hash o legacy)"""
+    if stored.startswith("hmac:"):
+        return hmac.compare_digest(stored, hash_api_key(key))
+    return hmac.compare_digest(key, stored)
+
+
+def key_storage_format(stored: str) -> str:
+    """Detectar el formato de almacenamiento de una key almacenada"""
+    return "hmac" if stored.startswith("hmac:") else "legacy"
+
+
+def mask_api_key_hash(stored: str) -> str:
+    """Enmascarar el hash de una API key para no exponerlo"""
+    if not stored:
+        return "-"
+    return stored[:12] + "..."
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -145,19 +175,33 @@ async def get_user_from_api_key(
     if not api_key:
         return None
     
-    # Buscar key en la base de datos (comparación directa, sin hash)
+    # Buscar key hasheada (HMAC-SHA256 indexado)
+    hashed = hash_api_key(api_key)
     result = await session.execute(
         select(APIKey).where(
-            APIKey.key_hash == api_key,
+            APIKey.key_hash == hashed,
             APIKey.is_active == True
         )
     )
     db_key = result.scalar_one_or_none()
     
+    # Fallback legacy: key almacenada sin hash (pre-migración)
     if not db_key:
+        result = await session.execute(
+            select(APIKey).where(
+                APIKey.key_hash == api_key,
+                APIKey.is_active == True
+            )
+        )
+        db_key = result.scalar_one_or_none()
+        if db_key:
+            # Upgrade-on-access: migrar al formato hash
+            db_key.key_hash = hashed
+    
+    if db_key is None:
         return None
     
-    # Actualizar last_used_at
+    # Actualizar last_used_at (mismo commit para last_used_at y upgrade)
     db_key.last_used_at = datetime.now(timezone.utc)
     await session.commit()
     

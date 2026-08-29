@@ -318,6 +318,7 @@ def create_server() -> FastMCP:
             """
             import secrets
             from core.database import async_session, APIKey, User
+            from core.auth import hash_api_key
             from sqlalchemy import select
 
             async with async_session() as session:
@@ -335,7 +336,7 @@ def create_server() -> FastMCP:
                 db_key = APIKey(
                     user_id=user.id,
                     name=name,
-                    key_hash=api_key_plain,
+                    key_hash=hash_api_key(api_key_plain),
                     permissions="chat",
                     is_active=True,
                 )

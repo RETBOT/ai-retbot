@@ -142,7 +142,7 @@ async def test_cli_commands_exist():
 async def test_full_api_key_workflow(client, db_session):
     """Test del flujo completo de API key"""
     from core.database import APIKey, User
-    from core.auth import hash_password
+    from core.auth import hash_password, hash_api_key
     from datetime import datetime, timedelta, timezone
     from core.config import settings
     import uuid
@@ -159,14 +159,14 @@ async def test_full_api_key_workflow(client, db_session):
     db_session.add(user)
     await db_session.commit()
     
-    # Crear API key (texto plano, convención real del proyecto)
+    # Crear API key (hash HMAC, convención del proyecto)
     api_key = "rb_test_workflow_key"
 
     db_key = APIKey(
         id=str(uuid.uuid4()),
         user_id=user.id,
         name="Test Workflow",
-        key_hash=api_key,
+        key_hash=hash_api_key(api_key),
         is_active=True
     )
     db_session.add(db_key)

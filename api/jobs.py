@@ -94,6 +94,15 @@ async def create_chat(
             detail="Streaming no soportado en este endpoint. Usa stream=false o el endpoint /api/v1/chat/completions con streaming habilitado."
         )
     
+    # max_tokens: validar 400 uniforme (evita que Pydantic castée bool como int)
+    if data.max_tokens is not None and (
+        isinstance(data.max_tokens, bool) or data.max_tokens < 1
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="max_tokens must be a positive integer"
+        )
+    
     # Obtener usuario (API Key > JWT > Default)
     user = None
     api_key = request.headers.get("X-API-Key")
@@ -199,7 +208,8 @@ Available tools:
         # (En el futuro podemos usar el formato nativo de tools de Ollama)
         response_text = provider.chat(
             message=user_message,
-            system_prompt=system_content
+            system_prompt=system_content,
+            num_predict=data.max_tokens
         )
         
         # Intentar parsear si hay tool calls
@@ -244,7 +254,8 @@ Available tools:
             final_prompt = "\n".join([f"{m['role']}: {m['content']}" for m in messages_for_model])
             final_response = provider.chat(
                 message="Basándote en los resultados de las tools, proporciona una respuesta final al usuario.",
-                system_prompt=final_prompt
+                system_prompt=final_prompt,
+                num_predict=data.max_tokens
             )
             response_text = final_response
         

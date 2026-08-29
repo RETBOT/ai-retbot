@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 from core.database import init_db, User, AuditLog, APIKey, async_session
-from core.auth import hash_password, verify_password, create_access_token
+from core.auth import hash_password, verify_password, create_access_token, hash_api_key
 from sqlalchemy import select
 from core.config import settings
 
@@ -144,7 +144,6 @@ async def audit_logs(args):
 async def create_api_key(args):
     """Crear API Key para un usuario"""
     import secrets
-    import hashlib
     
     await init_db()
     
@@ -164,8 +163,8 @@ async def create_api_key(args):
         random_part = secrets.token_urlsafe(32)
         api_key = f"rb_{random_part}"
         
-        # Hashear la key para almacenar
-        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        # Hashear la key para almacenar (HMAC-SHA256 con prefijo)
+        key_hash = hash_api_key(api_key)
         
         # Crear registro en DB
         db_key = APIKey(

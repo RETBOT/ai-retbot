@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
             admin_user_id = admin.id if admin else None
             
             new_key = APIKey(
-                key_hash=auto_api_key,  # Guardar sin hash
+                key_hash=hash_api_key(auto_api_key),
                 name="Auto-generated API Key",
                 user_id=admin_user_id,
                 is_active=True
@@ -91,7 +91,7 @@ async def lifespan(app: FastAPI):
 
 from core.config import settings
 from core.database import init_db, User
-from core.auth import hash_password
+from core.auth import hash_password, hash_api_key
 
 
 app = FastAPI(
