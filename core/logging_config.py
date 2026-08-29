@@ -14,6 +14,7 @@ Características:
 import logging
 import json
 import sys
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 import traceback
@@ -197,6 +198,10 @@ def setup_logging(
     
     # Agregar handler para archivo si se especifica
     if log_file:
+        # Crear el directorio del log si no existe (evita crash en
+        # máquinas recién clonadas o sin directorio logs/)
+        log_path = Path(log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setFormatter(JSONFormatter(service_name))
         root_logger.addHandler(file_handler)

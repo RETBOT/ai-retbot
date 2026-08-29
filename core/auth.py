@@ -83,10 +83,13 @@ def is_password_expired(user: User) -> bool:
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     session: AsyncSession = Depends(get_session)
 ) -> User:
     """Obtener usuario actual desde token"""
+    # HTTPBearer(auto_error=False) no lanza si falta el header → credentials=None
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     token = credentials.credentials
     payload = decode_token(token)
     user_id = payload.get("sub")
