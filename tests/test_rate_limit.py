@@ -17,6 +17,23 @@ API_KEY = "demo_key_123"
 HEADERS = {"X-API-Key": API_KEY}
 CHAT_URL = f"{BASE_URL}/api/v1/chat/completions"
 
+# System prompt de maxima brevedad: estos tests solo necesitan saber que el
+# endpoint responde 200/429, NO el contenido. Sin esto, cada request espera
+# una generacion completa del modelo en la CPU del runner (~15-60s x 68
+# requests = 15+ min de CI). Con el modelo cerrando en 1-3 tokens, cada
+# request baja a 2-4s.
+SYSTEM_SHORT = {"role": "system", "content": "Responde SOLO con la palabra OK."}
+
+
+def chat_payload(user_msg: str) -> dict:
+    """Payload de chat con system prompt corto (para agilizar el CI)."""
+    return {
+        "messages": [
+            SYSTEM_SHORT,
+            {"role": "user", "content": user_msg},
+        ]
+    }
+
 
 @pytest.mark.asyncio
 async def test_rate_limit_headers():
@@ -24,7 +41,7 @@ async def test_rate_limit_headers():
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(
             CHAT_URL,
-            json={"messages": [{"role": "user", "content": "Hola"}]},
+            json=chat_payload("Hola"),
             headers=HEADERS
         )
         
@@ -47,7 +64,7 @@ async def test_rate_limit_exceeded():
             try:
                 response = await client.post(
                     CHAT_URL,
-                    json={"messages": [{"role": "user", "content": f"Test {i}"}]},
+                    json=chat_payload(f"Test {i}"),
                     headers=HEADERS
                 )
                 
@@ -78,7 +95,7 @@ async def test_different_api_keys_have_separate_limits():
         for i in range(10):
             await client.post(
                 CHAT_URL,
-                json={"messages": [{"role": "user", "content": f"Key1 Test {i}"}]},
+                json=chat_payload(f"Key1 Test {i}"),
                 headers={"X-API-Key": "demo_key_123"}
             )
         
@@ -86,7 +103,7 @@ async def test_different_api_keys_have_separate_limits():
         for i in range(10):
             response = await client.post(
                 CHAT_URL,
-                json={"messages": [{"role": "user", "content": f"Key2 Test {i}"}]},
+                json=chat_payload(f"Key2 Test {i}"),
                 headers={"X-API-Key": "otra_api_key"}
             )
             
@@ -104,7 +121,7 @@ async def test_rate_limit_error_response():
         for i in range(30):
             response = await client.post(
                 CHAT_URL,
-                json={"messages": [{"role": "user", "content": f"Test {i}"}]},
+                json=chat_payload(f"Test {i}"),
                 headers=HEADERS
             )
             

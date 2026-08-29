@@ -61,7 +61,11 @@ async def test_chat_streaming_returns_200():
             headers={"X-API-Key": API_KEY},
             json={
                 "model": settings.MODEL_NAME,
-                "messages": [{"role": "user", "content": "Hola, responde en una sola frase."}],
+                # System prompt corto: este test solo valida el transporte SSE
+                "messages": [
+                    {"role": "system", "content": "Responde SOLO con la palabra OK."},
+                    {"role": "user", "content": "Hola"},
+                ],
                 "stream": True,
             },
         )
