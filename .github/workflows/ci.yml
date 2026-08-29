@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  unit:
+    name: Unit (MCP + tools + auth) - sin Ollama
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Correr suite unitaria
+        run: |
+          python -m pytest tests/test_mcp.py tests/test_tools.py \
+            tests/test_smoke.py tests/test_integration.py \
+            tests/test_api_keys.py -q
+
+  integration:
+    name: Integracion (API + Ollama) - server vivo
+    needs: unit
+    runs-on: ubuntu-latest
+    env:
+      OLLAMA_MODEL: qwen2.5-coder:0.5b
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Instalar Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          sleep 5
+
+      - name: Descargar modelo pequeno
+        run: |
+          timeout 600 ollama pull "$OLLAMA_MODEL"
+          ollama list
+
+      - name: Crear .env para CI
+        run: |
+          cat > .env <<EOF
+          OLLAMA_URL=http://127.0.0.1:11434
+          MODEL_NAME=$OLLAMA_MODEL
+          SECRET_KEY=ci_$(date +%s)_retbot_secret_key
+          RATE_LIMIT_PER_USER=30
+          RATE_LIMIT_PER_MINUTE=30
+          RATE_LIMIT_ENABLED=true
+          DATA_DIR=./data_ci
+          EOF
+
+      - name: Crear API keys de prueba en la DB
+        run: |
+          python - <<'PY'
+          import asyncio, uuid
+          from datetime import datetime, timedelta, timezone
+
+          from core.auth import hash_password
+          from core.config import settings
+          from core.database import APIKey, User, async_session, init_db
+
+          async def main():
+              await init_db()
+              async with async_session() as s:
+                  user = User(
+                      id=str(uuid.uuid4()),
+                      username="ci_default",
+                      password_hash=hash_password("ci12345"),
+                      is_active=True,
+                      password_changed_at=datetime.now(timezone.utc),
+                      password_expires_at=datetime.now(timezone.utc)
+                      + timedelta(days=settings.PASSWORD_EXPIRE_DAYS),
+                  )
+                  s.add(user)
+                  for key in ("demo_key_123", "otra_api_key"):
+                      s.add(APIKey(
+                          id=str(uuid.uuid4()),
+                          user_id=user.id,
+                          name=f"ci_{key}",
+                          key_hash=key,  # texto plano (convencion del proyecto)
+                          is_active=True,
+                      ))
+                  await s.commit()
+
+          asyncio.run(main())
+          PY
+
+      - name: Arrancar servidor RETBOT
+        run: |
+          nohup python server.py > server.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1; then
+              echo "Servidor arriba (intento $i)"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "El servidor no respondio /health"
+          tail -50 server.log || true
+          exit 1
+
+      - name: Correr tests de integracion (server vivo + Ollama)
+        run: |
+          python -m pytest tests/test_rate_limit.py tests/test_chat_e2e.py -q
+
+      - name: Logs del servidor (si algo fallo)
+        if: failure()
+        run: |
+          tail -100 server.log || true
