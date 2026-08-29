@@ -14,7 +14,24 @@
       "models": {
         "llama3.1:8b": {
           "name": "llama3.1:8b"
+        },
+        "qwen2.5-coder:3b": {
+          "name": "qwen2.5-coder:3b"
         }
+      }
+    }
+  },
+  "mcp": {
+    "retbot": {
+      "type": "local",
+      "command": [
+        "python",
+        "retbot_mcp/server.py"
+      ],
+      "enabled": true,
+      "environment": {
+        "MCP_WORKING_DIR": ".",
+        "MCP_ENABLE_ADMIN_WRITE": "false"
       }
     }
   },
@@ -28,7 +45,8 @@
         "read": true,
         "write": true,
         "edit": true,
-        "bash": true
+        "bash": true,
+        "mcp": true
       }
     }
   }

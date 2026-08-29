@@ -310,10 +310,14 @@ async def generate_opencode_config(
         # No podemos recuperar la key en texto plano, instructivo al usuario
         api_key_plain = "[TU_API_KEY_AQUI - Usa list-api-keys para ver tus keys]"
     
-    # Detectar URL base
-    host = request.headers.get("host", "localhost:8000")
-    scheme = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
-    base_url = f"{scheme}://{host}/api/v1"
+    # Detectar URL base: prioridad a PUBLIC_URL (portabilidad VPS/máquina local)
+    # Si está vacía, usar el header Host del request (comportamiento original)
+    if settings.PUBLIC_URL:
+        base_url = f"{settings.PUBLIC_URL.rstrip('/')}/api/v1"
+    else:
+        host = request.headers.get("host", "localhost:8000")
+        scheme = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
+        base_url = f"{scheme}://{host}/api/v1"
     
     config = {
         "$schema": "https://opencode.ai/config.json",

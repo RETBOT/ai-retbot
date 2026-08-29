@@ -213,6 +213,39 @@ curl http://TU_IP_PUBLICA:8000/admin/opencode-config
 
 Esto te devuelve un JSON que puedes copiar a tu configuración de OpenCode.
 
+### 🛠️ Integración MCP (Tools del agente)
+
+RETBOT incluye un **MCP Server** que expone sus capacidades (file operations,
+sistema, modelos, cache, usuarios y API keys) como herramientas que el agente
+descubre y usa automáticamente.
+
+**Genera la configuración automáticamente** (detecta tu OS, tu venv y tu URL):
+
+```bash
+python scripts/setup_opencode.py --api-key key_TU_API_KEY
+```
+
+Esto crea `opencode.json` con el provider `retbot` y el MCP server configurado.
+Reinicia OpenCode y listo.
+
+**O manualmente**, agrega esto a tu `opencode.json`:
+
+```json
+"mcp": {
+  "retbot": {
+    "type": "local",
+    "command": ["python", "retbot_mcp/server.py"],
+    "enabled": true,
+    "environment": {
+      "MCP_WORKING_DIR": ".",
+      "MCP_ENABLE_ADMIN_WRITE": "false"
+    }
+  }
+}
+```
+
+Detalles, lista de tools y ejemplos en [docs/MCP.md](docs/MCP.md).
+
 ---
 
 ## 🎯 ¿Qué es RETBOT?

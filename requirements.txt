@@ -21,6 +21,9 @@ arq
 opencode-agent-sdk
 httpx
 
+# MCP Server (Model Context Protocol)
+mcp>=1.27.0
+
 # Utilidades
 pydantic-settings
 python-dateutil

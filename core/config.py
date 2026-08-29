@@ -8,6 +8,11 @@ class Settings(BaseSettings):
 
     # Servidor
     PORT: int = 8000
+
+    # URL pública del servidor (para portabilidad en cualquier VPS/máquina)
+    # Vacía = se detecta automáticamente (header Host del request).
+    # Ejemplos: "https://mi-dominio.com" o "http://203.0.113.5:8000"
+    PUBLIC_URL: str = ""
     
     # Modelo - Llama 3.1 recomendado para function calling
     MODEL_NAME: str = "llama3.1:8b"
@@ -29,6 +34,14 @@ class Settings(BaseSettings):
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
+
+    # MCP Server (Model Context Protocol)
+    # Directorio base de trabajo para las file tools del MCP
+    # Vacío = directorio actual donde arranca el servidor
+    MCP_WORKING_DIR: str = ""
+    # Habilita tools de escritura admin del MCP (apikey.create/revoke, cache.clear)
+    # false por defecto: solo tools de lectura + filesystem
+    MCP_ENABLE_ADMIN_WRITE: bool = False
     
     # CORS - Lista de orígenes permitidos (separados por coma)
     # Por defecto solo permite localhost para desarrollo seguro

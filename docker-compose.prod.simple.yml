@@ -32,7 +32,10 @@ services:
       # Modelo (CPU-only)
       - MODEL_NAME=qwen2.5-coder:3b
       - MODEL_TYPE=ollama
-      - OLLAMA_URL=http://host.docker.internal:11434
+      # Ollama corre como servicio de este compose (portable en cualquier VPS)
+      # Si prefieres usar el Ollama del HOST (no Docker), cambia a:
+      #   OLLAMA_URL=http://host.docker.internal:11434
+      - OLLAMA_URL=http://ollama:11434
       
       # Redis (cache)
       - REDIS_URL=redis://redis:6379
@@ -58,9 +61,10 @@ services:
       - API_KEY
     env_file:
       - .env
-    extra_hosts:
-      # Para conectar con Ollama en el host
-      - "host.docker.internal:host-gateway"
+    # Solo necesario si usas OLLAMA_URL=http://host.docker.internal:11434
+    # (Ollama corriendo en el host, no en Docker)
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
     depends_on:
       redis:
         condition: service_healthy
