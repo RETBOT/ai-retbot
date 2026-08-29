@@ -77,37 +77,49 @@ async def test_chat_streaming_returns_200():
 
 @pytest.mark.skipif(not live_env, reason="Server u Ollama no disponibles (corren en CI)")
 async def test_chat_replies_with_content():
-    """El modelo responde con contenido real (no solo el chunk de rol)."""
-    async with httpx.AsyncClient(timeout=120) as client:
-        response = await client.post(
-            CHAT_URL,
-            headers={"X-API-Key": API_KEY},
-            json={
-                "model": settings.MODEL_NAME,
-                "messages": [{"role": "user", "content": "Dime unicamente: todo listo"}],
-                "stream": True,
-            },
+        """El modelo responde con contenido real (no solo el chunk de rol).
+
+        ATENCION: qwen2.5-coder:0.5b es un modelo de CODIFICACION. Con
+        instrucciones en lenguaje natural ("dime unicamente: todo listo")
+        alucina el patron de rechazo de asistentes ("I'm sorry, but I cannot
+        assist..."). En su idioma (completar codigo) acierta siempre.
+        El punto del test es validar el transporte SSE con contenido real del
+        modelo, no la inteligencia del mismo.
+        """
+
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                CHAT_URL,
+                headers={"X-API-Key": API_KEY},
+                json={
+                    "model": settings.MODEL_NAME,
+                    "messages": [{"role": "user", "content": "Completa este codigo Python:\ndef add(a, b):\n    return a"}],
+                    "stream": True,
+                },
+            )
+
+        assert response.status_code == 200, f"status {response.status_code}: {response.text[:300]}"
+
+        # Sumar el contenido de todos los chunks de contenido
+        import json
+
+        content_parts = []
+        for line in response.text.splitlines():
+            if line.startswith("data: "):
+                try:
+                    chunk = json.loads(line[6:])
+                except json.JSONDecodeError:
+                    continue
+                delta = chunk.get("choices", [{}])[0].get("delta", {})
+                if delta.get("content"):
+                    content_parts.append(delta["content"])
+
+        full = "".join(content_parts)
+        assert full.strip(), "El modelo no genero contenido (respuesta vacia)"
+        # La funcion add() completada: "a + b" o "a+b" (con/sin espacios)
+        assert any(op in full for op in ("a + b", "a+b", "+ b")), (
+            f"Respuesta inesperada: {full[:200]}"
         )
-
-    assert response.status_code == 200, f"status {response.status_code}: {response.text[:300]}"
-
-    # Sumar el contenido de todos los chunks de contenido
-    import json
-
-    content_parts = []
-    for line in response.text.splitlines():
-        if line.startswith("data: "):
-            try:
-                chunk = json.loads(line[6:])
-            except json.JSONDecodeError:
-                continue
-            delta = chunk.get("choices", [{}])[0].get("delta", {})
-            if delta.get("content"):
-                content_parts.append(delta["content"])
-
-    full = "".join(content_parts)
-    assert full.strip(), "El modelo no genero contenido (respuesta vacia)"
-    assert "todo listo" in full.lower(), f"Respuesta inesperada: {full[:200]}"
 
 
 @pytest.mark.skipif(not _server_available(), reason="Server no disponible")
