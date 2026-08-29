@@ -30,7 +30,7 @@ async def test_rate_limit_headers():
         
         # Verificar headers de rate limiting
         assert "X-RateLimit-Limit" in response.headers or response.status_code in [200, 429]
-        print(f"✅ Headers de rate limiting presentes")
+        print("[OK] Headers de rate limiting presentes")
         print(f"   X-RateLimit-Limit: {response.headers.get('X-RateLimit-Limit', 'N/A')}")
         print(f"   X-RateLimit-Remaining: {response.headers.get('X-RateLimit-Remaining', 'N/A')}")
 
@@ -46,7 +46,7 @@ async def test_rate_limit_exceeded():
         for i in range(25):
             try:
                 response = await client.post(
-                    f"{BASE_URL}/v1/chat/completions",
+                    CHAT_URL,
                     json={"messages": [{"role": "user", "content": f"Test {i}"}]},
                     headers=HEADERS
                 )
@@ -55,13 +55,13 @@ async def test_rate_limit_exceeded():
                     success_count += 1
                 elif response.status_code == 429:
                     rate_limited_count += 1
-                    print(f"⚠️ Rate limit alcanzado en request {i+1}")
+                    print(f"[WARN] Rate limit alcanzado en request {i+1}")
                     break
                     
             except Exception as e:
                 print(f"Error en request {i+1}: {e}")
         
-        print(f"\n📊 Resultados:")
+        print(f"\n-- Resultados:")
         print(f"   Requests exitosos: {success_count}")
         print(f"   Rate limited: {rate_limited_count}")
         
@@ -77,7 +77,7 @@ async def test_different_api_keys_have_separate_limits():
         # Hacer 10 requests con API key 1
         for i in range(10):
             await client.post(
-                f"{BASE_URL}/v1/chat/completions",
+                CHAT_URL,
                 json={"messages": [{"role": "user", "content": f"Key1 Test {i}"}]},
                 headers={"X-API-Key": "demo_key_123"}
             )
@@ -85,7 +85,7 @@ async def test_different_api_keys_have_separate_limits():
         # Hacer 10 requests con API key 2
         for i in range(10):
             response = await client.post(
-                f"{BASE_URL}/v1/chat/completions",
+                CHAT_URL,
                 json={"messages": [{"role": "user", "content": f"Key2 Test {i}"}]},
                 headers={"X-API-Key": "otra_api_key"}
             )
@@ -93,7 +93,7 @@ async def test_different_api_keys_have_separate_limits():
             # La segunda key debería tener sus propios límites
             assert response.status_code == 200, f"La segunda API key debería tener límites separados"
         
-        print("✅ Diferentes API keys tienen límites separados")
+        print("[OK] Diferentes API keys tienen limites separados")
 
 
 @pytest.mark.asyncio
@@ -103,7 +103,7 @@ async def test_rate_limit_error_response():
         # Hacer muchas requests hasta alcanzar el límite
         for i in range(30):
             response = await client.post(
-                f"{BASE_URL}/v1/chat/completions",
+                CHAT_URL,
                 json={"messages": [{"role": "user", "content": f"Test {i}"}]},
                 headers=HEADERS
             )
@@ -124,7 +124,7 @@ async def test_rate_limit_error_response():
 
 async def main():
     """Ejecutar tests manualmente"""
-    print("🧪 Test de Rate Limiting\n")
+    print("[TEST] Rate Limiting\n")
     
     try:
         print("Test 1: Headers de rate limiting...")
@@ -143,12 +143,12 @@ async def main():
         await test_rate_limit_error_response()
         print()
         
-        print("✅ Todos los tests pasaron!")
+        print("[OK] Todos los tests pasaron!")
         
     except AssertionError as e:
-        print(f"\n❌ Test fallido: {e}")
+        print(f"\n[FAIL] Test fallido: {e}")
     except httpx.ConnectError as e:
-        print(f"\n❌ Error de conexión: {e}")
+        print(f"\n[FAIL] Error de conexion: {e}")
         print(f"   ¿El servidor está corriendo en {BASE_URL}?")
         print(f"   Ejecutar: python server.py")
 

@@ -63,7 +63,7 @@ jobs:
           OLLAMA_URL=http://127.0.0.1:11434
           MODEL_NAME=$OLLAMA_MODEL
           SECRET_KEY=ci_$(date +%s)_retbot_secret_key
-          RATE_LIMIT_PER_USER=30
+          RATE_LIMIT_PER_USER=50
           RATE_LIMIT_PER_MINUTE=30
           RATE_LIMIT_ENABLED=true
           EOF
