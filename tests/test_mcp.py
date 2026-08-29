@@ -329,8 +329,36 @@ async def test_admin_write_tools_not_available():
 @pytest.mark.asyncio
 async def test_apikey_create_revoke_roundtrip(monkeypatch):
     """Con flag on: crear y revocar API key (roundtrip completo contra la DB)."""
-    from core.database import init_db
+    from datetime import datetime, timedelta, timezone
+    import uuid
+
+    from sqlalchemy import select
+
+    from core.auth import hash_password
+    from core.config import settings
+    from core.database import User, async_session, init_db
+
     await init_db()
+
+    # init_db solo crea las tablas; el usuario admin lo crea el lifespan de
+    # server.py. En un ambiente limpio (CI) NO existe -> crearlo aquí para
+    # que el test sea autocontenido (si ya existe, se reutiliza).
+    async with async_session() as session:
+        existing = await session.execute(
+            select(User).where(User.username == "admin")
+        )
+        if not existing.scalar_one_or_none():
+            session.add(User(
+                id=str(uuid.uuid4()),
+                username="admin",
+                password_hash=hash_password("admin"),
+                is_admin=True,
+                is_active=True,
+                password_changed_at=datetime.now(timezone.utc),
+                password_expires_at=datetime.now(timezone.utc)
+                + timedelta(days=settings.PASSWORD_EXPIRE_DAYS),
+            ))
+            await session.commit()
 
     import retbot_mcp.server as server_module
     server_module.ADMIN_WRITE = True

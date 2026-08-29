@@ -4,7 +4,7 @@ Fixtures y configuración para tests de RETBOT
 import asyncio
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import delete
@@ -69,9 +69,13 @@ async def client(db_session):
     
     app.dependency_overrides[get_session] = override_get_session
     
+    # httpx >= 0.28 removió el shortcut app= en AsyncClient: usar ASGITransport
+    # (compatible con httpx 0.27 y 0.28+)
+    transport = ASGITransport(app=app)
+    
     # Usar headers para simular requests con Origin válida para tests
     async with AsyncClient(
-        app=app, 
+        transport=transport,
         base_url="http://test",
         headers={"Origin": "http://localhost:3000"}
     ) as ac:
