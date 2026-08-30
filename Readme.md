@@ -5,6 +5,10 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/RETBOT/ai-retbot/actions/workflows/ci.yml/badge.svg)](https://github.com/RETBOT/ai-retbot/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/RETBOT/ai-retbot)](https://github.com/RETBOT/ai-retbot/releases)
+[![Tests: 88 passed](https://img.shields.io/badge/tests-88%20passed-brightgreen.svg)]()
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Mac-lightgrey.svg)]()
 
 > 🦜 Desarrollado y mantenido con **Quetzal**, el agente de arquitectura de software
 > para este proyecto → [github.com/RETBOT/quetzal](https://github.com/RETBOT/quetzal)
