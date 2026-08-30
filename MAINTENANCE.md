@@ -339,9 +339,14 @@ python cli/main.py list-api-keys --user admin
 # Crear nueva API key
 python cli/main.py create-api-key --user admin --name "Nueva Key"
 
-# Revocar key vieja (manual en DB)
-# sqlite3 data.db "DELETE FROM api_keys WHERE key='rb_old_key';"
+# Revocar key vieja (DELETE /admin/api-keys/{key_id} con token de admin)
+curl -X DELETE http://localhost:8000/admin/api-keys/<KEY_ID> \
+  -H "Authorization: Bearer <TOKEN_ADMIN>"
 ```
+
+> También puedes revocar keys desde la **Web UI** (pestaña API Keys) o usando el
+> comando `revoke` del servidor MCP. Las keys se guardan **hasheadas** (HMAC), así
+> que nunca verás el valor original en la base de datos.
 
 ### Cambiar Password de Admin
 

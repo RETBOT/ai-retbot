@@ -6,140 +6,131 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+> 🦜 Desarrollado y mantenido con **Quetzal**, el agente de arquitectura de software
+> para este proyecto → [github.com/RETBOT/quetzal](https://github.com/RETBOT/quetzal)
+
 ---
 
-## 🚀 Instalación Rápida (Linux - Kamatera)
+## 🚀 Instalación Rápida
+
+Instalación local (Windows / Linux / Mac) con Python + Ollama.
+¿Prefieres Docker? El repo incluye `docker-compose.yml` (desarrollo) y
+`docker-compose.gpu.yml` (producción con GPU) — ver [🐳 Docker con GPU](#-docker-con-gpu).
 
 ### Requisitos Previos
 
-- Servidor Linux (Ubuntu 20.04+, CentOS 7+, Debian 10+)
+- **Python 3.10+**
+- **Ollama** instalado y corriendo ([ollama.com](https://ollama.com))
 - 4GB RAM mínimo (8GB recomendado)
 - 2 CPUs mínimo (4+ recomendado)
-- 50GB disco libre
-- Acceso root o sudo
-- Puerto 8000 abierto en firewall
+- 10GB disco libre (para el modelo)
 
-### Paso 1: Instalar Docker y Docker Compose
+### 1. Clonar o descargar
 
 ```bash
-# Actualizar sistema
-sudo yum update -y  # Para CentOS/RHEL
-# o
-sudo apt update && sudo apt upgrade -y  # Para Ubuntu/Debian
-
-# Instalar Docker
-curl -fsSL https://get.docker.com | sh
-
-# Iniciar y habilitar Docker
-sudo systemctl enable docker
-sudo systemctl start docker
-
-# Agregar usuario al grupo docker (opcional, para no usar sudo)
-sudo usermod -aG docker $USER
-
-# Instalar Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# Verificar instalación
-docker --version
-docker-compose --version
+git clone https://github.com/RETBOT/ai-retbot.git
+cd ai-retbot
 ```
 
-### Paso 2: Clonar el Repositorio
+### 2. Crear entorno virtual
 
 ```bash
-# Ir a directorio de instalación
-cd /opt
+# Windows
+python -m venv venv
+venv\Scripts\activate
 
-# Clonar repositorio
-sudo git clone https://github.com/RETBOT/ai-retbot.git retbot-ai
-cd /opt/retbot-ai
-
-# Dar permisos
-sudo chown -R $USER:$USER /opt/retbot-ai
+# Linux/Mac
+python3 -m venv venv
+source venv/bin/activate
 ```
 
-### Paso 3: Configurar Variables de Entorno
+### 3. Instalar dependencias
 
 ```bash
-# Copiar archivo de ejemplo
-cp .env.example .env
-
-# Editar configuración
-vi .env
-# o
-nano .env
+pip install -r requirements.txt
 ```
 
-**Configuración mínima requerida:**
+### 4. Configurar variables de entorno
 
-```bash
-# Seguridad
-SECRET_KEY=tu_secret_key_muy_larga_y_segura_aqui_12345
-ADMIN_PASSWORD=tu_password_de_admin
+Crear archivo `.env` en la raíz:
 
-# Modelo (CPU-only)
+```env
+# ============================================
+# CONFIGURACIÓN OBLIGATORIA
+# ============================================
+
+# Password del usuario admin (se crea automáticamente al iniciar)
+ADMIN_PASSWORD=TuPasswordSuperSegura123!
+
+# Clave secreta para JWT (cambiar en producción)
+SECRET_KEY=tu_clave_secreta_larga_y_aleatoria_minimo_32_caracteres
+
+# ============================================
+# CONFIGURACIÓN OPCIONAL
+# ============================================
+
+# Modelo a usar (default: llama3.1:8b). Recomendado para programación:
 MODEL_NAME=qwen2.5-coder:3b
-MODEL_TYPE=ollama
-OLLAMA_URL=http://ollama:11434
 
-# Redis (cache)
-REDIS_URL=redis://redis:6379
+# Puerto del servidor (default: 8000)
+PORT=8000
 
-# Logging
-LOG_LEVEL=INFO
-LOG_FORMAT=json
+# URL de Ollama (default: http://localhost:11434)
+OLLAMA_URL=http://localhost:11434
 
-# CORS (agregar tu IP pública)
-ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000,http://TU_IP_PUBLICA:8000
+# Rate limiting - requests por minuto (default: 10)
+RATE_LIMIT_PER_MINUTE=10
+
+# CORS - Orígenes permitidos (separados por coma)
+# Para desarrollo local, los localhost están permitidos por defecto
+# En producción, agregar tu dominio: ALLOWED_ORIGINS=https://tu-dominio.com
+# Para permitir todos: ALLOWED_ORIGINS=*
 ```
 
-> **💡 Tip:** Para generar un SECRET_KEY seguro:
+> 💡 Para generar un `SECRET_KEY` seguro:
 > ```bash
 > openssl rand -hex 32
 > ```
 
-### Paso 4: Iniciar Servicios
+### 5. Descargar modelo en Ollama
 
 ```bash
-# Iniciar todos los servicios (API, Ollama, Redis)
-docker-compose -f docker-compose.prod.simple.yml up -d
+# Modelo recomendado para programación
+ollama pull qwen2.5-coder:3b
 
-# Ver estado de contenedores
-docker-compose -f docker-compose.prod.simple.yml ps
-
-# Ver logs en tiempo real
-docker-compose -f docker-compose.prod.simple.yml logs -f
+# O modelo general
+ollama pull llama3.1:8b
 ```
 
-### Paso 5: Descargar Modelo
+### 6. Iniciar la API
 
 ```bash
-# Esperar 30 segundos a que Ollama inicie
-sleep 30
-
-# Descargar modelo (puede tardar 5-10 minutos)
-docker exec retbot-ollama ollama pull qwen2.5-coder:3b
-
-# Ver modelos instalados
-docker exec retbot-ollama ollama list
+python server.py
 ```
 
-### Paso 6: Verificar Instalación
+Verás algo como:
+```
+INFO:     Started server process [12345]
+INFO:     Waiting for application startup.
+INFO:     Base de datos inicializada
+INFO:     Usuario admin creado desde .env
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000
+```
+
+### 7. Verificar Instalación
 
 ```bash
-# Health check
 curl http://localhost:8000/health
-
-# Health check completo
-curl http://localhost:8000/health/full
 ```
 
-**Deberías ver algo como:**
+Deberías ver algo como:
 ```json
 {"status":"healthy","timestamp":"2026-04-27T...","service":"retbot"}
 ```
+
+✅ **Listo!** La API está corriendo en `http://localhost:8000`. Sigue con
+**[🔐 Primer Acceso](#-primer-acceso)** para crear tu primer API Key.
 
 ---
 
@@ -152,10 +143,7 @@ Abre en tu navegador:
 http://TU_IP_PUBLICA:8000/admin/ui
 ```
 
-Ejemplo para Kamatera:
-```
-http://103.101.201.229:8000/admin/ui
-```
+> 💡 Reemplaza `TU_IP_PUBLICA` con la IP pública o dominio de tu servidor.
 
 **Credenciales por defecto:**
 - **Usuario:** `admin`
@@ -169,6 +157,10 @@ http://103.101.201.229:8000/admin/ui
 4. Ponle un nombre (ej: `OpenCode`, `Prueba`)
 5. **Copia la API Key del modal** (solo se muestra una vez)
 6. Guárdala en un lugar seguro
+
+> **🔒 Almacenamiento:** las API keys se guardan **hasheadas** (HMAC-SHA256), nunca
+> en texto plano. La key completa **solo se ve al crearla**; si la pierdes, revócala
+> y crea una nueva.
 
 ### 3. Probar API
 
@@ -245,6 +237,20 @@ Reinicia OpenCode y listo.
 ```
 
 Detalles, lista de tools y ejemplos en [docs/MCP.md](docs/MCP.md).
+
+### 🦜 Agente Quetzal (recomendado)
+
+**Quetzal** es el agente de arquitectura que se usa para diseñar, revisar y mantener
+RETBOT — piensa primero el diseño, el código al último.
+
+- 📦 Repositorio: [github.com/RETBOT/quetzal](https://github.com/RETBOT/quetzal)
+- **Modo de trabajo:** PLAN → BUILD → REVIEW (cuestiona decisiones antes de codear)
+- **Memoria persistente:** recuerda decisiones y bugs entre sesiones (Engram)
+- **Integración:** usa el provider `retbot` y el MCP server descritos arriba para
+  operar directamente sobre el repo
+
+Para usarlo: arranca la API, genera tu API key, y referencia este repo como agente
+en tu configuración de OpenCode.
 
 ---
 
@@ -560,100 +566,6 @@ model_list:
 
 ---
 
-## 🚀 Instalación Rápida
-
-### 1. Clonar o descargar
-
-```bash
-git clone <URL_DEL_REPO>
-cd ai
-```
-
-### 2. Crear entorno virtual
-
-```bash
-# Windows
-python -m venv venv
-venv\Scripts\activate
-
-# Linux/Mac
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 3. Instalar dependencias
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configurar variables de entorno
-
-Crear archivo `.env` en la raíz:
-
-```env
-# ============================================
-# CONFIGURACIÓN OBLIGATORIA
-# ============================================
-
-# Password del usuario admin (se crea automáticamente al iniciar)
-ADMIN_PASSWORD=TuPasswordSuperSegura123!
-
-# Clave secreta para JWT (cambiar en producción)
-SECRET_KEY=tu_clave_secreta_larga_y_aleatoria_minimo_32_caracteres
-
-# ============================================
-# CONFIGURACIÓN OPCIONAL
-# ============================================
-
-# Modelo a usar (default: llama3.1:8b)
-MODEL_NAME=llama3.1:8b
-
-# Puerto del servidor (default: 8000)
-PORT=8000
-
-# URL de Ollama (default: http://localhost:11434)
-OLLAMA_URL=http://localhost:11434
-
-# Rate limiting - requests por minuto (default: 10)
-RATE_LIMIT_PER_MINUTE=10
-
-# CORS - Orígenes permitidos (separados por coma)
-# Para desarrollo local, los localhost están permitidos por defecto
-# En producción, agregar tu dominio: ALLOWED_ORIGINS=https://tu-dominio.com
-# Para permitir todos: ALLOWED_ORIGINS=*
-```
-
-### 5. Descargar modelo en Ollama
-
-```bash
-# Modelo recomendado (instalar primero)
-ollama pull llama3.1:8b
-
-# O modelo más ligero
-ollama pull llama3.2
-```
-
-### 6. Iniciar la API
-
-```bash
-python server.py
-```
-
-Verás algo como:
-```
-INFO:     Started server process [12345]
-INFO:     Waiting for application startup.
-INFO:     Base de datos inicializada
-INFO:     Usuario admin creado desde .env
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8000
-```
-
-✅ **Listo!** La API está corriendo en `http://localhost:8000`
-
----
-
 ## 🔧 Configuración con OpenCode
 
 ### Opción A: Generar configuración automáticamente (Recomendado)
@@ -731,6 +643,9 @@ python cli/main.py create-api-key \
 # Ver todas tus API keys
 python cli/main.py list-api-keys --user admin
 ```
+
+> 🔑 La key completa **solo se muestra al crearla**; `list-api-keys` muestra el hash
+> enmascarado y el formato de almacenamiento (`hmac`/`legacy`).
 
 ---
 
@@ -906,14 +821,23 @@ pytest --cov=core --cov=api --cov-report=html
 
 ### Test Results
 
+Suite unitaria (corre en el job `unit` del CI, sin Ollama):
+
 ```
-tests/test_smoke.py       ✅ 5 passed   (Health, root, models, auth)
-tests/test_api_keys.py    ✅ 4 passed   (API key auth)
-tests/test_tools.py       ✅ 12 passed  (All 5 tools)
-tests/test_integration.py ✅ 10 passed  (E2E workflows)
+tests/test_smoke.py        ✅ passed   (Health, root, models, auth)
+tests/test_api_keys.py     ✅ passed   (API key auth + contratos reveal/list)
+tests/test_auth_hash.py    ✅ passed   (Hash HMAC: formato, verify, upgrade legacy)
+tests/test_max_tokens.py   ✅ passed   (Payload num_predict + 400 de inválidos)
+tests/test_tools.py        ✅ passed   (Tools)
+tests/test_mcp.py          ✅ passed   (Servidor MCP)
+tests/test_integration.py  ✅ passed   (Workflows E2E)
 --------------------------------------------------
-TOTAL                     ✅ 31 passed
+TOTAL                      ✅ 88 passed
 ```
+
+Los tests de integración con **Ollama real** (`test_rate_limit.py`, `test_chat_e2e.py`)
+corren en el job `integration` del CI: levantan el servidor vivo + Ollama y validan el
+pipeline completo (SSE, rate limit, `max_tokens`) contra `qwen2.5-coder:0.5b`.
 
 ---
 
@@ -1179,6 +1103,10 @@ python cli/main.py create-api-key --user admin --name "Nueva Key"
 # X-API-Key: rb_tu_key_aqui
 ```
 
+> 💡 ¿Tu key es de antes del hashing (formato `legacy`)? No pasa nada: se migra sola
+> a hash en el primer uso. Para ver el formato actual:
+> `python scripts/list_api_keys.py`
+
 ### "Modelo no soporta tools"
 
 Si el LLM no está usando tools correctamente:
@@ -1221,47 +1149,59 @@ lsof -ti:8000 | xargs kill -9
 ai/
 ├── api/                    # Routers de FastAPI
 │   ├── __init__.py
-│   ├── admin.py           # Endpoints admin + setup/opencode
+│   ├── admin.py           # Endpoints admin + API keys + setup/opencode
 │   ├── auth.py            # Login, JWT
-│   ├── jobs.py            # Chat completions con tools
-│   └── streaming.py       # Streaming SSE + /v1/models
+│   ├── jobs.py            # Chat completions con tools (soporta max_tokens)
+│   └── streaming.py       # Streaming SSE + /v1/models (soporta max_tokens)
 ├── cli/                    # CLI de administración
 │   ├── __init__.py
 │   └── main.py            # Comandos: create-api-key, list-api-keys, etc.
 ├── core/                   # Core business logic
 │   ├── __init__.py
-│   ├── auth.py            # JWT + API Key validation
+│   ├── auth.py            # JWT + API Key validation (hash HMAC + upgrade legacy)
 │   ├── config.py          # Settings (Pydantic)
 │   ├── database.py        # SQLAlchemy models
-│   ├── models.py          # Ollama provider + system prompt
-│   └── tools/             # 🆕 Tools/Function Calling
+│   ├── models.py          # Ollama provider + build_ollama_payload + max_tokens
+│   └── tools/             # Tools/Function Calling
 │       ├── __init__.py
 │       ├── definitions.py # Schemas de tools
 │       └── executor.py    # ToolExecutor seguro
-├── scripts/                # 🆕 Scripts de mantenimiento
+├── retbot_mcp/             # MCP Server (tools del agente)
+│   └── server.py          # APIConnector + tools expuestas (apikey.create, etc.)
+├── scripts/                # Scripts de mantenimiento
+│   ├── list_api_keys.py   # Lista keys enmascaradas + formato de almacenamiento
 │   ├── update_models.sh   # Actualización (Linux/Mac/WSL)
 │   ├── update_models.ps1  # Actualización (Windows)
 │   └── update_models.py   # Actualización (Cross-platform)
 ├── tests/                  # Tests con pytest
 │   ├── __init__.py
-│   ├── conftest.py        # Fixtures
+│   ├── conftest.py        # Fixtures (client ASGI, db, usuarios)
 │   ├── test_smoke.py      # Tests básicos
-│   ├── test_api_keys.py   # Tests de API keys
+│   ├── test_api_keys.py   # Tests de API keys + contratos reveal/list
+│   ├── test_auth_hash.py  # Tests del hash HMAC / upgrade legacy
+│   ├── test_max_tokens.py # Tests del parámetro max_tokens
 │   ├── test_tools.py      # Tests de tools
-│   └── test_integration.py # Tests E2E
-├── backups/                # 🆕 Backups automáticos (gitignore)
-├── logs/                   # 🆕 Logs del sistema (gitignore)
+│   ├── test_mcp.py        # Tests del servidor MCP
+│   ├── test_integration.py # Tests E2E
+│   ├── test_rate_limit.py # Rate limiting (server vivo, job integration)
+│   └── test_chat_e2e.py   # Chat E2E real con Ollama (job integration)
+├── web/                    # Web UI de administración
+│   └── index.html         # Login, API keys, chat
+├── .github/workflows/     # CI (ubuntu-latest: jobs unit + integration)
+│   └── ci.yml
+├── backups/                # Backups automáticos (gitignore)
+├── logs/                   # Logs del sistema (gitignore)
 ├── server.py              # Entry point FastAPI
 ├── requirements.txt       # Dependencias
 ├── .env                   # Variables de entorno (gitignore)
 ├── .env.example           # Ejemplo de .env
 ├── docker-compose.yml     # Docker para desarrollo
-├── docker-compose.gpu.yml # 🆕 Docker para producción con GPU
-├── nginx.conf.example     # 🆕 Load balancing config
+├── docker-compose.gpu.yml # Docker para producción con GPU
+├── nginx.conf.example     # Load balancing config
 ├── Readme.md              # Este archivo
-├── GPU_SETUP_GUIDE.md     # 🆕 Guía de configuración de GPUs
-├── CONFIGURACION_RAPIDA.md # 🆕 Referencia rápida
-└── MAINTENANCE.md         # 🆕 Guía de mantenimiento
+├── GPU_SETUP_GUIDE.md     # Guía de configuración de GPUs
+├── CONFIGURACION_RAPIDA.md # Referencia rápida
+└── MAINTENANCE.md         # Guía de mantenimiento
 ```
 
 ---
@@ -1276,6 +1216,26 @@ ai/
 4. **Rate limiting** - Ajustar `RATE_LIMIT_PER_MINUTE` según necesidad
 5. **Firewall** - Solo exponer puerto necesario
 6. **Backups** - Respaldar `data.db` regularmente
+7. **SECRET_KEY estable** - Sus cambios invalidan los JWTs **y los hashes de API keys**
+
+### API Keys: almacenamiento con hash (HMAC-SHA256)
+
+Las API keys **nunca se guardan en texto plano** desde la v2:
+
+- Al crearse se almacenan como **HMAC-SHA256** firmado con `SECRET_KEY`
+  (formato `hmac:` + hex, visible al listarlas)
+- El valor completo solo se muestra **una vez**, al momento de crear la key
+- `GET /admin/api-keys/{id}/reveal` devuelve `key: null` + mensaje si la key está
+  hasheada (solo las legacy devuelven el valor real)
+- **Upgrade automático:** una key creada antes de esta versión (formato `legacy`)
+  se migra a hash en **su primer uso** — no tienes que hacer nada
+- Los listados (`web UI`, `/admin/api-keys`, CLI, MCP) siempre muestran el hash
+  **enmascarado**, nunca el valor completo
+
+> ⚠️ **SECRET_KEY es doblemente crítica**: además de firmar los JWTs, protege los
+> hashes de las API keys. Usa un valor aleatorio largo (32+ chars) y **mantenlo
+> estable** entre reinicios — si cambias `SECRET_KEY`, las keys hasheadas dejan de
+> ser válidas (las legacy siguen funcionando y se re-hashean en el primer uso).
 
 ### Variables sensibles
 
@@ -1297,6 +1257,8 @@ __pycache__/
 - [x] **Docker Compose con GPU** - docker-compose.gpu.yml listo para producción
 - [x] **Load Balancing** - Nginx config para múltiples instancias de Ollama
 - [x] **Documentación GPU** - Guía detallada de configuración
+- [x] **API Keys con hash** - Almacenamiento HMAC-SHA256 + upgrade automático de legacy
+- [x] **max_tokens en chat** - Límite de generación por request (no-stream y streaming)
 - [ ] **Streaming con Tools** - Implementar SSE interrumpido por tool execution
 - [ ] **Más Tools** - Git operations, búsqueda de código, análisis estático
 - [ ] **Web UI** - Interfaz web para administración
@@ -1339,73 +1301,72 @@ Este proyecto está licenciado bajo MIT License - ver el archivo [LICENSE](LICEN
 
 ```bash
 # Ver contenedores corriendo
-docker-compose -f docker-compose.prod.simple.yml ps
+docker-compose -f docker-compose.gpu.yml ps
 
 # Ver logs en tiempo real
-docker-compose -f docker-compose.prod.simple.yml logs -f
+docker-compose -f docker-compose.gpu.yml logs -f
 
 # Ver logs solo de API
-docker-compose -f docker-compose.prod.simple.yml logs -f api
+docker-compose -f docker-compose.gpu.yml logs -f api
 
 # Ver logs solo de Ollama
-docker-compose -f docker-compose.prod.simple.yml logs -f ollama
+docker-compose -f docker-compose.gpu.yml logs -f ollama
 
-# Ver logs solo de Redis
-docker-compose -f docker-compose.prod.simple.yml logs -f redis
+# Ver uso de recursos
+docker stats
 ```
 
 ### Reiniciar Servicios
 
 ```bash
 # Reiniciar todos los servicios
-docker-compose -f docker-compose.prod.simple.yml restart
+docker-compose -f docker-compose.gpu.yml restart
 
 # Reiniciar solo API
-docker-compose -f docker-compose.prod.simple.yml restart api
+docker-compose -f docker-compose.gpu.yml restart api
 
 # Reiniciar solo Ollama
-docker-compose -f docker-compose.prod.simple.yml restart ollama
+docker-compose -f docker-compose.gpu.yml restart ollama
 ```
 
 ### Actualizar RETBOT
 
 ```bash
 # Ir al directorio del proyecto
-cd /opt/retbot-ai
+cd <TU_DIR_DEL_PROYECTO>
 
 # Bajar últimos cambios
 git pull origin main
 
 # Reiniciar servicios con nuevos cambios
-docker-compose -f docker-compose.prod.simple.yml down
-docker-compose -f docker-compose.prod.simple.yml up -d
+docker-compose -f docker-compose.gpu.yml down
+docker-compose -f docker-compose.gpu.yml up -d
 
 # Ver logs para confirmar que inició bien
-docker-compose -f docker-compose.prod.simple.yml logs -f api
+docker-compose -f docker-compose.gpu.yml logs -f api
 ```
 
 ### Ver API Keys en Base de Datos
 
 ```bash
-# Usar script incluido
-cd /opt/retbot-ai
-docker exec retbot-api python /app/scripts/list_api_keys.py
+# Usar script incluido (mostrará hashes enmascarados + formato)
+docker-compose -f docker-compose.gpu.yml exec api python /app/scripts/list_api_keys.py
 ```
 
 ### Gestionar Modelos de Ollama
 
 ```bash
 # Ver modelos instalados
-docker exec retbot-ollama ollama list
+docker-compose -f docker-compose.gpu.yml exec ollama ollama list
 
 # Descargar nuevo modelo
-docker exec retbot-ollama ollama pull qwen2.5-coder:7b
+docker-compose -f docker-compose.gpu.yml exec ollama ollama pull qwen2.5-coder:7b
 
 # Eliminar modelo
-docker exec retbot-ollama ollama rm qwen2.5-coder:3b
+docker-compose -f docker-compose.gpu.yml exec ollama ollama rm qwen2.5-coder:3b
 
 # Ver uso de VRAM/RAM
-docker exec retbot-ollama ollama ps
+docker-compose -f docker-compose.gpu.yml exec ollama ollama ps
 ```
 
 ### Health Checks
@@ -1424,14 +1385,14 @@ curl http://TU_IP_PUBLICA:8000/health
 ### Backup de Datos
 
 ```bash
-# Backup de base de datos SQLite
-cp /opt/retbot-ai/data/retbot.db /opt/retbot-ai/data/retbot.db.backup.$(date +%Y%m%d)
+# Backup de base de datos SQLite (data.db en la raíz del proyecto)
+cp data.db data.db.backup.$(date +%Y%m%d)
 
-# Backup de modelos de Ollama
-tar -czf ollama_backup_$(date +%Y%m%d).tar.gz /opt/retbot-ai/ollama_data/
+# Backup de modelos de Ollama (solo si usas volúmenes locales)
+tar -czf ollama_backup_$(date +%Y%m%d).tar.gz <TU_DIR_MODELOS_OLLAMA>/
 
 # Backup de logs
-tar -czf logs_backup_$(date +%Y%m%d).tar.gz /opt/retbot-ai/logs/
+tar -czf logs_backup_$(date +%Y%m%d).tar.gz logs/
 ```
 
 ### Limpieza
@@ -1463,7 +1424,7 @@ docker system prune -a -f
 
 ```bash
 # Ver API Keys en BD
-docker exec retbot-api python /app/scripts/list_api_keys.py
+docker-compose -f docker-compose.gpu.yml exec api python /app/scripts/list_api_keys.py
 ```
 
 ### Error: "Ollama no está disponible"
@@ -1473,16 +1434,16 @@ docker exec retbot-api python /app/scripts/list_api_keys.py
 **Solución:**
 ```bash
 # Verificar si Ollama está corriendo
-docker-compose -f docker-compose.prod.simple.yml ps ollama
+docker-compose -f docker-compose.gpu.yml ps ollama
 
 # Ver logs de Ollama
-docker logs retbot-ollama
+docker-compose -f docker-compose.gpu.yml logs ollama
 
 # Reiniciar Ollama
-docker-compose -f docker-compose.prod.simple.yml restart ollama
+docker-compose -f docker-compose.gpu.yml restart ollama
 
 # Verificar conexión desde API
-docker exec retbot-api curl http://ollama:11434/api/tags
+docker-compose -f docker-compose.gpu.yml exec api curl http://ollama:11434/api/tags
 ```
 
 ### Error: "Address already in use"
@@ -1508,14 +1469,14 @@ kill -9 <PID>
 **Solución:**
 ```bash
 # Asegurar que estás en el directorio correcto
-cd /opt/retbot-ai
+cd <TU_DIR_DEL_PROYECTO>
 
 # Verificar que el código se actualizó
 git log -1 --oneline
 
 # Reiniciar contenedores
-docker-compose -f docker-compose.prod.simple.yml down
-docker-compose -f docker-compose.prod.simple.yml up -d
+docker-compose -f docker-compose.gpu.yml down
+docker-compose -f docker-compose.gpu.yml up -d
 ```
 
 ### Ollama usa CPU en lugar de GPU
@@ -1541,68 +1502,6 @@ docker run --rm --gpus all nvidia/cuda:11.0.3-base-ubuntu20.04 nvidia-smi
 1. Usar modelo más pequeño (ej: `qwen2.5-coder:3b`)
 2. Reducir `OLLAMA_CONTEXT_LENGTH` en `.env`
 3. Agregar más RAM o GPU
-
----
-
-##  Configuración para Kamatera
-
-### Requisitos Recomendados
-
-| Componente | Mínimo | Recomendado |
-|------------|--------|-------------|
-| **CPU** | 2 cores | 4+ cores |
-| **RAM** | 4GB | 8GB+ |
-| **Disco** | 50GB SSD | 100GB SSD |
-| **OS** | Ubuntu 20.04 | Ubuntu 22.04 |
-| **Firewall** | Puerto 8000 abierto | Puerto 8000 + 22 (SSH) |
-
-### Pasos en Kamatera Console
-
-1. **Crear Servidor:**
-   - Ir a [Kamatera Console](https://console.kamatera.com/)
-   - Click en "Create Server"
-   - Seleccionar Ubuntu 22.04 LTS
-   - Configurar CPU/RAM según tabla arriba
-   - Agregar 50-100GB SSD
-
-2. **Configurar Firewall:**
-   - En Kamatera Console, ir a "Firewall"
-   - Crear nuevo firewall o editar existente
-   - Agregar reglas:
-     - Puerto 22 (SSH) - Tu IP
-     - Puerto 8000 (API) - 0.0.0.0/0 (público)
-
-3. **IP Pública:**
-   - Anotar la IP pública del servidor
-   - Ejemplo: `103.101.201.229`
-
-4. **Conectar por SSH:**
-   ```bash
-   ssh root@103.101.201.229
-   ```
-
-5. **Seguir guía de instalación** (ver arriba)
-
-### URLs de Acceso
-
-Una vez instalado:
-
-| Servicio | URL |
-|----------|-----|
-| **Web UI Admin** | `http://103.101.201.229:8000/admin/ui` |
-| **API Endpoint** | `http://103.101.201.229:8000/api/v1` |
-| **Health Check** | `http://103.101.201.229:8000/health` |
-| **OpenCode Config** | `http://103.101.201.229:8000/admin/opencode-config` |
-
-### Configuración OpenCode para Kamatera
-
-| Campo | Valor |
-|-------|-------|
-| **ID Proveedor** | `retbot` |
-| **Nombre** | `RETBOT AI` |
-| **URL Base** | `http://103.101.201.229:8000/api/v1` |
-| **API Key** | `key_TU_API_KEY_AQUI` |
-| **Modelo** | `qwen2.5-coder:3b` |
 
 ---
 
