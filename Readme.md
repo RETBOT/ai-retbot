@@ -13,6 +13,10 @@
 > 🦜 Desarrollado y mantenido con **Quetzal**, el agente de arquitectura de software
 > para este proyecto → [github.com/RETBOT/quetzal](https://github.com/RETBOT/quetzal)
 
+<p align="center">
+  <img src="assets/ai.png" alt="RETBOT - AI Coding Assistant API" width="100%">
+</p>
+
 ---
 
 ## 🚀 Instalación Rápida
