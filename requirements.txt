@@ -22,7 +22,7 @@ opencode-agent-sdk
 httpx
 
 # MCP Server (Model Context Protocol)
-mcp>=1.27.0
+mcp>=2.1.1
 
 # Utilidades
 pydantic-settings
